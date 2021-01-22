@@ -1,0 +1,20 @@
+[package]
+name = "backend"
+version = "0.1.0"
+authors = ["Kevin Oberlies <favilo@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+anyhow = "1.0.37"
+itertools = "0.10.0"
+lights = { path = "../lights" }
+log = "0.4.11"
+palette = "0.5.0"
+rs_ws281x = "0.3.1"
+serde = { version = "1.0.118", features = ["derive"] }
+signal-hook = "0.3.2"
+async-std = "1.9.0"
+
+[dependencies.tide]
+git = "https://github.com/http-rs/tide"
+branch = "main"

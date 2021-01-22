@@ -1,0 +1,9 @@
+[workspace]
+members = [
+    "lights",
+    "backend",
+    "frontend"
+]
+exclude = [
+    "frontend-seed",
+]
