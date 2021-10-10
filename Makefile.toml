@@ -1,6 +1,16 @@
 [config]
 default_to_workspace = false
 
+[env]
+RPI_WS281X_SYSROOT = "/usr/arm-linux-gnueabihf"
+
+[tasks.watch]
+description = "Watch files and recompile the project on change"
+run_task = [
+         { name = "build_release" },
+]
+watch = true
+
 # ---- BUILD ----
 
 [tasks.build]

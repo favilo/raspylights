@@ -76,6 +76,9 @@ async fn web_main() -> Result<()> {
     let mut app = tide::Server::with_state(());
     app.at("/").serve_file("./frontend/index.html")?;
     app.at("/pkg").serve_dir("./frontend/pkg/")?;
+    app.at("/mdc").serve_dir("./frontend/static/mdc/")?;
+    app.at("/style.css")
+        .serve_file("./frontend/static/style.css")?;
     app.listen("0.0.0.0:8000").await?;
     Ok(())
 }

@@ -5,14 +5,14 @@ authors = ["Kevin Oberlies <favilo@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-anyhow = "1.0.37"
-itertools = "0.10.0"
+anyhow = "1.0.42"
+itertools = "0.10.1"
 lights = { path = "../lights" }
-log = "0.4.11"
-palette = "0.5.0"
-rs_ws281x = "0.3.1"
-serde = { version = "1.0.118", features = ["derive"] }
-signal-hook = "0.3.2"
+log = "0.4.14"
+palette = "0.6.0"
+rs_ws281x = "*"
+serde = { version = "1.0.126", features = ["derive"] }
+signal-hook = "0.3.9"
 async-std = "1.9.0"
 
 [dependencies.tide]

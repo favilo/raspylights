@@ -7,13 +7,16 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-palette = "0.5.0"
-serde = { version = "1.0.118", features = ["derive"] }
+palette = { version = "0.6.0", features = ["serializing"] }
+serde = { version = "1.0.126", features = ["derive"] }
 # rs_ws281x = { git = "https://github.com/favilo/rpi-ws281x-rust", branch = "master" }
-log = "0.4.11"
-itertools = "0.10.0"
-thiserror = "1.0.23"
+log = "0.4.14"
+itertools = "0.10.1"
+thiserror = "1.0.26"
 enum-iterator = "0.6.0"
 enum_derive = "0.1.7"
-instant = { version = "0.1.9", features = ["now", "wasm-bindgen"] }
 mopa = "0.2.2"
+strum = { version = "0.21.0", features = ["derive"] }
+serde_traitobject = "0.2.7"
+serde_millis = "0.1.1"
+metatype = "0.2.1"

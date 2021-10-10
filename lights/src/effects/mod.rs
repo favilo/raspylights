@@ -1,18 +1,22 @@
-use instant::{Duration, Instant};
-use std::{fmt::Debug, str::FromStr};
+use std::{
+    fmt::Debug,
+    str::FromStr,
+    time::{Duration, Instant},
+};
 
 use crate::error::{Error, Result};
 use mopa::mopafy;
-use palette::{Gradient, Hsv, LinSrgb};
+use palette::{convert::FromColor, Gradient, Hsv, LinSrgb};
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Copy, Debug, enum_iterator::IntoEnumIterator)]
+#[derive(Clone, Copy, Debug, strum::EnumIter, Serialize, Deserialize, PartialEq)]
 pub enum EffectType {
     Empty,
-    Composite,
     Ball,
     Balls,
     Glow,
     Rainbow,
+    Composite,
 }
 
 impl EffectType {
@@ -43,7 +47,9 @@ impl FromStr for EffectType {
     }
 }
 
-pub trait Effect: Debug + mopa::Any {
+pub trait Effect:
+    Debug + mopa::Any + serde_traitobject::Serialize + serde_traitobject::Deserialize
+{
     fn render(&mut self, controller: &mut [LinSrgb<u8>], t: Instant) -> Result<Duration>;
     fn is_ready(&self, t: Instant) -> bool;
     fn to_type(&self) -> EffectType;
@@ -51,7 +57,7 @@ pub trait Effect: Debug + mopa::Any {
 
 mopafy!(Effect);
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Empty;
 
 impl Effect for Empty {
@@ -68,8 +74,11 @@ impl Effect for Empty {
     }
 }
 
-#[derive(Debug)]
-pub struct Composite(Box<dyn Effect>, Box<dyn Effect>);
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Composite(
+    #[serde(with = "serde_traitobject")] Box<dyn Effect>,
+    #[serde(with = "serde_traitobject")] Box<dyn Effect>,
+);
 
 impl Default for Composite {
     fn default() -> Self {
@@ -110,16 +119,17 @@ impl Effect for Composite {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Ball {
-    color: LinSrgb<u8>,
-    position: usize,
-    count: usize,
-    direction: i8,
-    bounce: bool,
+    pub color: LinSrgb<u8>,
+    pub position: usize,
+    pub count: usize,
+    pub direction: i8,
+    pub bounce: bool,
 
-    delay: Duration,
-    next_update: Instant,
+    pub delay: Duration,
+    #[serde(with = "serde_millis")]
+    next_update: Option<Instant>,
 }
 
 impl Ball {
@@ -139,7 +149,7 @@ impl Ball {
             count,
 
             delay,
-            next_update: Instant::now(),
+            next_update: None,
         }
     }
 
@@ -188,6 +198,14 @@ impl Ball {
             }
         }
     }
+
+    pub fn color(&self) -> LinSrgb<u8> {
+        self.color
+    }
+
+    pub fn is_bounce(&self) -> bool {
+        self.bounce
+    }
 }
 
 impl Default for Ball {
@@ -199,7 +217,7 @@ impl Default for Ball {
             direction: 1,
             bounce: false,
             delay: Duration::from_millis(100),
-            next_update: Instant::now(),
+            next_update: None,
         }
     }
 }
@@ -210,20 +228,27 @@ impl Effect for Ball {
             self.update_state();
             let pixel = (self.position as isize + self.direction as isize) as usize % self.count;
             self.position = pixel;
-            self.next_update = t + self.delay;
+            self.next_update = Some(t + self.delay);
         }
         pixels[self.position] = self.color;
 
-        let time_left = self.next_update.duration_since(t);
+        let time_left = self
+            .next_update
+            .map(|u| u.duration_since(t))
+            .unwrap_or(Duration::from_secs(0));
         if self.delay > time_left {
-            Ok(self.delay - self.next_update.duration_since(t))
+            Ok(self.delay
+                - self
+                    .next_update
+                    .map(|u| u.duration_since(t))
+                    .unwrap_or(Duration::from_secs(0)))
         } else {
             Ok(self.delay)
         }
     }
 
     fn is_ready(&self, t: Instant) -> bool {
-        t >= self.next_update
+        self.next_update.is_none() || t >= self.next_update.unwrap()
     }
 
     fn to_type(&self) -> EffectType {
@@ -231,7 +256,7 @@ impl Effect for Ball {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Balls(Vec<Ball>);
 
 impl Balls {
@@ -241,6 +266,10 @@ impl Balls {
 
     pub fn balls(&self) -> &[Ball] {
         &self.0
+    }
+
+    pub fn add_ball(&mut self) {
+        self.0.push(Ball::default());
     }
 }
 
@@ -266,7 +295,7 @@ impl Effect for Balls {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Glow {
     colors: Vec<LinSrgb<u8>>,
     color_idx: usize,
@@ -275,7 +304,8 @@ pub struct Glow {
     steps: usize,
 
     delay: Duration,
-    next_update: Instant,
+    #[serde(with = "serde_millis")]
+    next_update: Option<Instant>,
 }
 
 impl Glow {
@@ -288,7 +318,7 @@ impl Glow {
             steps,
 
             delay,
-            next_update: Instant::now(),
+            next_update: None,
         }
     }
 }
@@ -303,8 +333,10 @@ impl Effect for Glow {
     fn render(&mut self, pixels: &mut [LinSrgb<u8>], t: Instant) -> Result<Duration> {
         let color: LinSrgb<u8> = if self.is_ready(t) {
             let gradient = Gradient::new(vec![
-                Hsv::from(self.colors[self.color_idx].into_format()),
-                Hsv::from(self.colors[(self.color_idx + 1) % self.colors.len()].into_format()),
+                Hsv::from_color(self.colors[self.color_idx].into_format()),
+                Hsv::from_color(
+                    self.colors[(self.color_idx + 1) % self.colors.len()].into_format(),
+                ),
             ]);
             let color = gradient.get(self.step as f32 / self.steps as f32);
             self.step += 1;
@@ -313,8 +345,8 @@ impl Effect for Glow {
                 self.color_idx = (self.color_idx + 1) % self.colors.len();
             }
 
-            self.next_update = t + self.delay;
-            LinSrgb::from(color).into_format()
+            self.next_update = Some(t + self.delay);
+            LinSrgb::from_color(color).into_format()
         } else {
             LinSrgb::new(0, 0, 0)
         };
@@ -323,16 +355,18 @@ impl Effect for Glow {
             *pixel = color;
         }
 
-        let time_left = self.next_update.duration_since(t);
-        if self.delay > time_left {
-            Ok(self.delay - self.next_update.duration_since(t))
+        let time_left = self.next_update.map(|u| u.duration_since(t));
+        if time_left.is_none() {
+            Ok(self.delay)
+        } else if self.delay > time_left.unwrap() {
+            Ok(self.delay - time_left.unwrap())
         } else {
             Ok(self.delay)
         }
     }
 
     fn is_ready(&self, t: Instant) -> bool {
-        t >= self.next_update
+        self.next_update.map(|u| t >= u).unwrap_or(true)
     }
 
     fn to_type(&self) -> EffectType {
