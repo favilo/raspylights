@@ -70,6 +70,17 @@ impl EffectType {
             EffectType::Glow(g) => Box::new(g.clone()),
         }
     }
+
+    pub fn default_from_name(name: &str) -> Self {
+        match name {
+            "Empty" => Self::Empty,
+            "Ball" => Self::Ball(Default::default()),
+            "Balls" => Self::Balls(Default::default()),
+            "Glow" => Self::Glow(Default::default()),
+            "Composite" => Self::Composite(Default::default()),
+            _ => Default::default(),
+        }
+    }
 }
 
 impl Default for EffectType {

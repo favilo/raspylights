@@ -13,6 +13,7 @@ use crate::{
 };
 
 const EFFECT_KEY: &str = "org.favil.raspylights.effect";
+const LAST_EFFECT_KEY: &str = "org.favil.raspylights.effect.last";
 
 pub struct App {
     link: ComponentLink<Self>,
@@ -45,14 +46,7 @@ impl Component for App {
 
     fn create(_: Self::Properties, link: ComponentLink<Self>) -> Self {
         let storage = StorageService::new(Area::Local).unwrap();
-        let effect_str = storage.restore::<Result<String, anyhow::Error>>(EFFECT_KEY);
-        let model = if let Ok(effect_str) = effect_str {
-            let effect: Result<Model, _> = serde_json::from_str(&effect_str);
-            log::info!("Loading: {:?}", effect);
-            effect.unwrap_or_else(|_| Default::default())
-        } else {
-            Default::default()
-        };
+        let model = Self::load_model(&storage);
 
         App {
             link,
@@ -65,16 +59,18 @@ impl Component for App {
         log::info!("App update called");
         match msg {
             Msg::SetType(t) => {
-                self.model.effect_type = t;
+                // Used for when we click the title
+                self.model.effect_type = self.load_last_effect(t.name())
             }
             Msg::SetEffect(effect) => {
-                self.model.effect_type = effect.to_cloned_type();
+                // Used to update the effect
+                let effect_type = effect.to_cloned_type();
+                self.store_last_effect(&effect_type);
+                self.model.effect_type = effect_type;
             }
         }
         log::info!("Storing: {:?}", self.model.effect_type);
-        let model: &Model = &self.model;
-        let s: String = serde_json::to_string(model).unwrap();
-        self.storage.store(EFFECT_KEY, Ok(s));
+        self.store_model();
         true
     }
 
@@ -83,7 +79,7 @@ impl Component for App {
     }
 
     fn view(&self) -> Html {
-        let dropdown = self.view_dropdown();
+        let dropdown = self.view_selector();
         let effect = self.view_own_effect();
         html! {
             <>
@@ -97,7 +93,44 @@ impl Component for App {
 }
 
 impl App {
-    fn view_dropdown(&self) -> Html {
+    fn load_model(storage: &StorageService) -> Model {
+        let effect_str = storage.restore::<Result<String, anyhow::Error>>(EFFECT_KEY);
+        if let Ok(effect_str) = effect_str {
+            let effect: Result<Model, _> = serde_json::from_str(&effect_str);
+            log::info!("Loading: {:?}", effect);
+            effect.unwrap_or_else(|_| Default::default())
+        } else {
+            Default::default()
+        }
+    }
+
+    fn store_model(&mut self) {
+        let model: &Model = &self.model;
+        let s: String = serde_json::to_string(model).unwrap();
+        self.storage.store(EFFECT_KEY, Ok(s));
+    }
+
+    fn load_last_effect(&mut self, ty: &str) -> EffectType {
+        let last_effect = format!("{}.{}", LAST_EFFECT_KEY, ty);
+        let effect_str = self
+            .storage
+            .restore::<Result<String, anyhow::Error>>(&last_effect);
+        if let Ok(effect_str) = effect_str {
+            let effect: Result<EffectType, _> = serde_json::from_str(&effect_str);
+            log::info!("Loading: {:?}", effect);
+            effect.unwrap_or_else(|_| EffectType::default_from_name(ty))
+        } else {
+            EffectType::default_from_name(ty)
+        }
+    }
+
+    fn store_last_effect(&mut self, et: &EffectType) {
+        let s: String = serde_json::to_string(et).unwrap();
+        self.storage
+            .store(&format!("{}.{}", LAST_EFFECT_KEY, et.name()), Ok(s));
+    }
+
+    fn view_selector(&self) -> Html {
         html! {
             <components::Selector
                 id = { "main" }

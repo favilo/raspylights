@@ -68,7 +68,7 @@ impl Component for Ball {
         self.props
             .onupdate
             .as_ref()
-            .map(|u| u.emit(self.props.ball.clone()));
+            .map(|u| u.emit(self.to_effect()));
         true
     }
 
@@ -102,7 +102,7 @@ impl Component for Ball {
                                     let s = v.trim_start_matches('#');
                                     let v = hex::decode_to_slice(s, &mut buf);
                                     if v.is_err() {
-                                        return Msg::Color(color.clone());
+                                        return Msg::Color(color);
                                     }
 
                                     Msg::Color(LinSrgb::new(buf[0], buf[1], buf[2]))
