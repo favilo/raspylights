@@ -17,7 +17,7 @@ use tide::{prelude::*, Request};
 mod strip;
 
 #[allow(dead_code)]
-fn make_colors() -> Result<()> {
+fn render_main() -> Result<()> {
     let term = Arc::new(AtomicBool::new(false));
     for sig in &[
         consts::SIGTERM,
@@ -84,7 +84,7 @@ async fn web_main() -> Result<()> {
 }
 
 fn main() -> Result<()> {
-    // make_colors()?;
+    // render_main()?;
     async_std::task::block_on(async { web_main().await })?;
     Ok(())
 }

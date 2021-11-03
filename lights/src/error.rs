@@ -7,4 +7,7 @@ pub enum Error {
 
     #[error("Bad effect type")]
     BadEffectType,
+
+    #[error("Index out of range")]
+    IndexOutOfRange,
 }

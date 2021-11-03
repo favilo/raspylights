@@ -9,26 +9,72 @@ use mopa::mopafy;
 use palette::{convert::FromColor, Gradient, Hsv, LinSrgb};
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Copy, Debug, strum::EnumIter, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum EffectType {
     Empty,
-    Ball,
-    Balls,
-    Glow,
-    Rainbow,
-    Composite,
+    Ball(Ball),
+    Balls(Balls),
+    Glow(Glow),
+    // Rainbow(Rainbow),
+    Composite(Composite),
 }
 
 impl EffectType {
-    pub fn to_default(&self) -> Box<dyn Effect> {
+    pub fn iter_names() -> impl Iterator<Item = &'static str> {
+        [
+            Self::Empty.name(),
+            Self::Ball(Default::default()).name(),
+            Self::Balls(Default::default()).name(),
+            Self::Glow(Default::default()).name(),
+            Self::Composite(Default::default()).name(),
+        ]
+        .into_iter()
+    }
+
+    pub fn name(&self) -> &'static str {
+        match self {
+            EffectType::Empty => "Empty",
+            EffectType::Composite(_) => "Composite",
+            EffectType::Ball(_) => "Ball",
+            EffectType::Balls(_) => "Balls",
+            EffectType::Glow(_) => "Glow",
+        }
+    }
+
+    pub fn into_inner(self) -> Box<dyn Effect> {
         match self {
             EffectType::Empty => Box::new(Empty),
-            EffectType::Composite => Box::new(Composite::default()),
-            EffectType::Ball => Box::new(Ball::default()),
-            EffectType::Balls => Box::new(Balls::default()),
-            EffectType::Glow => Box::new(Glow::default()),
-            EffectType::Rainbow => todo!(),
+            EffectType::Composite(c) => Box::new(c),
+            EffectType::Ball(b) => Box::new(b),
+            EffectType::Balls(bs) => Box::new(bs),
+            EffectType::Glow(g) => Box::new(g),
         }
+    }
+
+    pub fn inner_as_ref(&self) -> &dyn Effect {
+        match self {
+            EffectType::Empty => &Empty,
+            EffectType::Composite(c) => c,
+            EffectType::Ball(b) => b,
+            EffectType::Balls(bs) => bs,
+            EffectType::Glow(g) => g,
+        }
+    }
+
+    pub fn to_inner_cloned(&self) -> Box<dyn Effect> {
+        match self {
+            EffectType::Empty => Box::new(Empty),
+            EffectType::Composite(c) => Box::new(c.clone()),
+            EffectType::Ball(b) => Box::new(b.clone()),
+            EffectType::Balls(bs) => Box::new(bs.clone()),
+            EffectType::Glow(g) => Box::new(g.clone()),
+        }
+    }
+}
+
+impl Default for EffectType {
+    fn default() -> Self {
+        Self::Empty
     }
 }
 
@@ -38,10 +84,11 @@ impl FromStr for EffectType {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "Empty" => Ok(Self::Empty),
-            "Composite" => Ok(Self::Composite),
-            "Balls" => Ok(Self::Balls),
-            "Glow" => Ok(Self::Glow),
-            "Rainbow" => todo!(),
+            "Composite" => Ok(Self::Composite(Default::default())),
+            "Ball" => Ok(Self::Ball(Default::default())),
+            "Balls" => Ok(Self::Balls(Default::default())),
+            "Glow" => Ok(Self::Glow(Default::default())),
+            // "Rainbow" => Ok(Self::Rainbow(Default::default())),
             _ => Err(Error::BadEffectType),
         }
     }
@@ -52,12 +99,14 @@ pub trait Effect:
 {
     fn render(&mut self, controller: &mut [LinSrgb<u8>], t: Instant) -> Result<Duration>;
     fn is_ready(&self, t: Instant) -> bool;
-    fn to_type(&self) -> EffectType;
+    fn into_type(self) -> EffectType;
+
+    fn to_cloned_type(&self) -> EffectType;
 }
 
 mopafy!(Effect);
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 pub struct Empty;
 
 impl Effect for Empty {
@@ -69,16 +118,17 @@ impl Effect for Empty {
         true
     }
 
-    fn to_type(&self) -> EffectType {
+    fn into_type(self) -> EffectType {
+        EffectType::Empty
+    }
+
+    fn to_cloned_type(&self) -> EffectType {
         EffectType::Empty
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Composite(
-    #[serde(with = "serde_traitobject")] Box<dyn Effect>,
-    #[serde(with = "serde_traitobject")] Box<dyn Effect>,
-);
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+pub struct Composite(Box<EffectType>, Box<EffectType>);
 
 impl Default for Composite {
     fn default() -> Self {
@@ -92,34 +142,54 @@ impl Composite {
         E: Effect,
         F: Effect,
     {
-        Ok(Self(Box::new(first), Box::new(second)))
+        Ok(Self(
+            Box::new(first.into_type()),
+            Box::new(second.into_type()),
+        ))
     }
 
-    pub fn first(&self) -> &Box<dyn Effect> {
+    pub fn first(&self) -> &EffectType {
         &self.0
     }
 
-    pub fn second(&self) -> &Box<dyn Effect> {
+    pub fn set_first(&mut self, e: EffectType) {
+        self.0 = Box::new(e);
+    }
+
+    pub fn second(&self) -> &EffectType {
         &self.1
+    }
+
+    pub fn set_second(&mut self, e: EffectType) {
+        self.1 = Box::new(e);
     }
 }
 
 impl Effect for Composite {
     fn render(&mut self, controller: &mut [LinSrgb<u8>], t: Instant) -> Result<Duration> {
-        let d = self.0.render(controller, t)?;
-        Ok(std::cmp::min(d, self.1.render(controller, t)?))
+        let d = self.0.to_inner_cloned().render(controller, t)?;
+        Ok(std::cmp::min(
+            d,
+            self.1.to_inner_cloned().render(controller, t)?,
+        ))
     }
 
     fn is_ready(&self, t: Instant) -> bool {
-        [&self.0, &self.1].iter().any(|e| e.is_ready(t))
+        [self.0.inner_as_ref(), self.1.inner_as_ref()]
+            .iter()
+            .any(|e| e.is_ready(t))
     }
 
-    fn to_type(&self) -> EffectType {
-        EffectType::Composite
+    fn into_type(self) -> EffectType {
+        EffectType::Composite(self)
+    }
+
+    fn to_cloned_type(&self) -> EffectType {
+        EffectType::Composite(self.clone())
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Ball {
     pub color: LinSrgb<u8>,
     pub position: usize,
@@ -211,7 +281,7 @@ impl Ball {
 impl Default for Ball {
     fn default() -> Self {
         Self {
-            color: LinSrgb::new(0, 0, 0),
+            color: LinSrgb::new(255, 0, 0),
             position: 0,
             count: 0,
             direction: 1,
@@ -251,12 +321,16 @@ impl Effect for Ball {
         self.next_update.is_none() || t >= self.next_update.unwrap()
     }
 
-    fn to_type(&self) -> EffectType {
-        EffectType::Ball
+    fn into_type(self) -> EffectType {
+        EffectType::Ball(self)
+    }
+
+    fn to_cloned_type(&self) -> EffectType {
+        EffectType::Ball(self.clone())
     }
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 pub struct Balls(Vec<Ball>);
 
 impl Balls {
@@ -270,6 +344,11 @@ impl Balls {
 
     pub fn add_ball(&mut self) {
         self.0.push(Ball::default());
+    }
+
+    pub fn set_ball(&mut self, idx: usize, ball: Ball) -> Result<()> {
+        *self.0.get_mut(idx).ok_or(Error::IndexOutOfRange)? = ball;
+        Ok(())
     }
 }
 
@@ -290,12 +369,16 @@ impl Effect for Balls {
         self.0.iter().any(|b| b.is_ready(t))
     }
 
-    fn to_type(&self) -> EffectType {
-        EffectType::Balls
+    fn into_type(self) -> EffectType {
+        EffectType::Balls(self)
+    }
+
+    fn to_cloned_type(&self) -> EffectType {
+        EffectType::Balls(self.clone())
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Glow {
     colors: Vec<LinSrgb<u8>>,
     color_idx: usize,
@@ -369,7 +452,11 @@ impl Effect for Glow {
         self.next_update.map(|u| t >= u).unwrap_or(true)
     }
 
-    fn to_type(&self) -> EffectType {
-        EffectType::Glow
+    fn into_type(self) -> EffectType {
+        EffectType::Glow(self)
+    }
+
+    fn to_cloned_type(&self) -> EffectType {
+        EffectType::Glow(self.clone())
     }
 }

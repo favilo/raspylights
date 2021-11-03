@@ -846,6 +846,7 @@ dependencies = [
  "wee_alloc",
  "yew",
  "yew-mdc-widgets",
+ "yewtil",
 ]
 
 [[package]]
@@ -1346,6 +1347,7 @@ dependencies = [
  "serde_traitobject",
  "strum",
  "thiserror",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -2574,6 +2576,19 @@ dependencies = [
  "gloo 0.3.0",
  "js-sys",
  "wasm-bindgen",
+ "web-sys",
+ "yew",
+]
+
+[[package]]
+name = "yewtil"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8543663ac49cd613df079282a1d8bdbdebdad6e02bac229f870fd4237b5d9aaa"
+dependencies = [
+ "log",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
  "web-sys",
  "yew",
 ]

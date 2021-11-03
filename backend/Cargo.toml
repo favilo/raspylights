@@ -2,7 +2,7 @@
 name = "backend"
 version = "0.1.0"
 authors = ["Kevin Oberlies <favilo@gmail.com>"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 anyhow = "1.0.42"

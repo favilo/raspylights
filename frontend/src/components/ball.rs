@@ -3,21 +3,18 @@ use std::time::Duration;
 use palette::LinSrgb;
 
 use yew::prelude::*;
-
-use crate::app;
+use yewtil::NeqAssign;
 
 #[derive(Clone, Debug)]
 pub(crate) struct Ball {
     link: ComponentLink<Self>,
 
-    ball: lights::effects::Ball,
-    onupdate: Option<Callback<app::Msg>>,
-    idx: usize,
+    props: Props,
 }
 
 impl Ball {
     fn to_effect(&self) -> lights::effects::Ball {
-        self.ball.clone()
+        self.props.ball.clone()
     }
 }
 
@@ -27,26 +24,15 @@ pub(crate) enum Msg {
     Count(usize),
     Direction(i8),
     Bounce(bool),
+    Delay(u64),
 }
 
 #[derive(Clone, PartialEq, Properties, Debug)]
 pub(crate) struct Props {
     #[prop_or_default]
-    pub onupdate: Option<Callback<app::Msg>>,
-    #[prop_or(LinSrgb::new(255, 0, 0))]
-    pub color: LinSrgb<u8>,
+    pub onupdate: Option<Callback<lights::effects::Ball>>,
     #[prop_or_default]
-    pub position: usize,
-    #[prop_or(1)]
-    pub count: usize,
-    #[prop_or(1)]
-    pub direction: i8,
-    #[prop_or(false)]
-    pub bounce: bool,
-    #[prop_or(Duration::from_millis(200))]
-    pub delay: Duration,
-    #[prop_or(0)]
-    pub idx: usize,
+    pub ball: lights::effects::Ball,
 }
 
 impl Component for Ball {
@@ -55,93 +41,161 @@ impl Component for Ball {
     type Properties = Props;
 
     fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
-        log::info!("Props: {:?}", props);
-        let ball = lights::effects::Ball::new(
-            props.color,
-            props.position,
-            props.direction,
-            props.bounce,
-            props.delay,
-            props.count,
-        );
-        Self {
-            link,
-            ball,
-            idx: props.idx,
-            onupdate: props.onupdate,
-        }
+        Self { link, props }
     }
 
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
         match msg {
             Msg::Color(color) => {
-                self.ball.color = color;
+                self.props.ball.color = color;
             }
             Msg::Pos(pos) => {
-                self.ball.position = pos;
+                self.props.ball.position = pos;
             }
             Msg::Count(count) => {
-                self.ball.count = count;
+                self.props.ball.count = count;
             }
             Msg::Direction(direction) => {
-                self.ball.direction = direction;
+                self.props.ball.direction = direction;
             }
             Msg::Bounce(bounce) => {
-                self.ball.bounce = bounce;
+                self.props.ball.bounce = bounce;
+            }
+            Msg::Delay(delay) => {
+                self.props.ball.delay = Duration::from_millis(delay);
             }
         }
-        // self.onupdate.as_ref().map(|u| u.emit(app::msg::redraw));
+        self.props
+            .onupdate
+            .as_ref()
+            .map(|u| u.emit(self.props.ball.clone()));
         true
     }
 
     fn change(&mut self, props: Self::Properties) -> ShouldRender {
-        self.ball.color = props.color;
-        self.ball.position = props.position;
-        self.ball.count = props.count;
-        self.ball.direction = props.direction;
-        self.ball.bounce = props.bounce;
-        self.ball.delay = props.delay;
-        true
+        self.props.neq_assign(props)
     }
 
     fn view(&self) -> Html {
-        let behaviour = if self.ball.is_bounce() {
-            "Bouncing"
+        let is_bounce = self.props.ball.is_bounce();
+        let ball_direction = self.props.ball.direction;
+        let behaviour = if is_bounce { "Bouncing" } else { "Wrapping" };
+        let direction = if ball_direction == 1 {
+            "Forward"
         } else {
-            "Wrapping"
+            "Backward"
         };
-        let color = self.ball.color();
-        log::info!("Color: {}, {}, {}", color.red, color.green, color.blue);
+        let color = self.props.ball.color();
         html! {
             <>
                 <h1>{ "Ball" }</h1>
-                <p>{ "Color: " }
-            <input type="color"
-                value={ format!("#{:02x}{:02x}{:02x}", color.red, color.green, color.blue) }
-                onchange={ self.link.callback(move |c: ChangeData| {
-                    match &c {
-                        ChangeData::Value(v) => {
-                            let mut buf = [0_u8; 3];
-                            let s = v.trim_start_matches('#');
-                            let v = hex::decode_to_slice(s, &mut buf);
-                            if v.is_err() {
-                                return Msg::Color(color.clone());
+                <p>
+                    <label for="ball_color">{ "Color: " }</label>
+                    <input type="color"
+                        id={ "ball_color" }
+                        name={ "ball_color" }
+                        value={ format!("#{:02x}{:02x}{:02x}", color.red, color.green, color.blue) }
+                        onchange={ self.link.callback(move |c: ChangeData| {
+                            match &c {
+                                ChangeData::Value(v) => {
+                                    let mut buf = [0_u8; 3];
+                                    let s = v.trim_start_matches('#');
+                                    let v = hex::decode_to_slice(s, &mut buf);
+                                    if v.is_err() {
+                                        return Msg::Color(color.clone());
+                                    }
+
+                                    Msg::Color(LinSrgb::new(buf[0], buf[1], buf[2]))
+
+                                }
+                                _ => {
+                                    log::error!("Wong changedata type");
+                                    unreachable!("wrong changedata type?")
+                                },
                             }
-
-                            Msg::Color(LinSrgb::new(buf[0], buf[1], buf[2]))
-
-                        }
-                        _ => unreachable!("wrong changedata type?"),
-                    }
-                }) }
-            />
+                        }) }
+                    />
                 </p>
-                <p>{ "Behaviour: " }<span>{ behaviour }</span></p>
-                </>
+                <p>
+                    <label for="starting_point">{ "Starting Point:" }</label>
+                    <input type="number" value="0" id="starting_point" name="starting_point" />
+                </p>
+                <p>
+                    <label for="behavior">{ "Behavior: " }</label>
+                    <input type="button"
+                        id="behavior"
+                        name="behavior"
+                        onclick={
+                            self.link.callback(move |_| {
+                                Msg::Bounce(!is_bounce)
+                            })
+                        }
+                        value={ behaviour }
+                    />
+                </p>
+                <p>
+                    <label for="direction">{ "Direction: " }</label>
+                    <input type="button"
+                        id="direction"
+                        name="direction"
+                        onclick={
+                            self.link.callback(move |_| {
+                                Msg::Direction(ball_direction * -1)
+                            })
+                        }
+                        value={ direction }
+                    />
+                </p>
+                <p>
+                    <label for="delay">{ "Delay between movements: " }</label>
+                    <input type="range"
+                        min="10"
+                        max="1000"
+                        step="10"
+                        id="delay"
+                        name="delay"
+                        onchange={
+                            self.link.callback(move |ty| {
+                                let delay = match ty {
+                                    ChangeData::Value(s) => {
+                                        s.parse().unwrap_or(100)
+                                    }
+                                    _ => 100,
+                                };
+                                Msg::Delay(delay)
+                            })
+                        }
+                        oninput={
+                            self.link.callback(move |ty:InputData| {
+                                let delay = ty.value.parse().unwrap_or(100);
+                                Msg::Delay(delay)
+                            })
+                        }
+                        value= { self.props.ball.delay.as_millis().to_string() }
+                    />
+                    <input type="number" name="delay" id="delay_real"
+                        onchange={
+                            self.link.callback(move |ty| {
+                                let delay = match ty {
+                                    ChangeData::Value(s) => {
+                                        s.parse().unwrap_or(100)
+                                    }
+                                    _ => 100,
+                                };
+                                Msg::Delay(delay)
+                            })
+                        }
+                        oninput={
+                            self.link.callback(move |ty:InputData| {
+                                let delay = ty.value.parse().unwrap_or(100);
+                                Msg::Delay(delay)
+                            })
+                        }
+                        value= { self.props.ball.delay.as_millis().to_string() }
+                    />
+                    <span>{ "ms" }</span>
+                </p>
+            </>
         }
     }
-
-    fn rendered(&mut self, _first_render: bool) {}
-
-    fn destroy(&mut self) {}
 }

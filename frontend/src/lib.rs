@@ -3,6 +3,7 @@
 use wasm_bindgen::prelude::*;
 mod app;
 mod components;
+mod utils;
 
 #[cfg(feature = "wee_alloc")]
 #[global_allocator]

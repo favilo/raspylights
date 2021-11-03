@@ -2,7 +2,7 @@
 name = "lights"
 version = "0.1.0"
 authors = ["Kevin Oberlies <favilo@gmail.com>"]
-edition = "2018"
+edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -10,6 +10,7 @@ edition = "2018"
 palette = { version = "0.6.0", features = ["serializing"] }
 serde = { version = "1.0.126", features = ["derive"] }
 # rs_ws281x = { git = "https://github.com/favilo/rpi-ws281x-rust", branch = "master" }
+wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
 log = "0.4.14"
 itertools = "0.10.1"
 thiserror = "1.0.26"

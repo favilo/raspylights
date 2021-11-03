@@ -44,6 +44,16 @@ extend = "build_server"
 description = "Build server in release mode"
 args = ["build", "--package", "backend", "--release", "--target=x86_64-unknown-linux-gnu"]
 
+[tasks.build_rpi]
+extend = "build_server"
+description = "Build server in debug mode for Raspberry Pi"
+args = ["build", "--package", "backend", "--target=armv7-unknown-linux-gnueabihf"]
+
+[tasks.build_rpi_release]
+extend = "build_server"
+description = "Build server in release mode for Raspberry Pi"
+args = ["build", "--package", "backend", "--release", "--target=armv7-unknown-linux-gnueabihf"]
+
 # ---- START ----
 
 [tasks.start]

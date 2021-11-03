@@ -1,36 +1,32 @@
-use std::time::Duration;
-
-use palette::LinSrgb;
-
 use yew::prelude::*;
-
-use crate::app;
+use yew_mdc_widgets::Button;
+use yewtil::NeqAssign;
 
 #[derive(Clone, Debug)]
 pub(crate) struct Balls {
     link: ComponentLink<Self>,
 
-    balls: lights::effects::Balls,
-    onupdate: Option<Callback<app::Msg>>,
+    props: Props,
 }
 
 impl Balls {
     fn to_effect(&self) -> lights::effects::Balls {
-        self.balls.clone()
+        self.props.balls.clone()
     }
 }
 
 pub(crate) enum Msg {
-    Update(usize, super::Ball),
+    SetBall(usize, lights::effects::Ball),
+    AddBall,
 }
 
 #[derive(Clone, PartialEq, Properties, Debug)]
 pub(crate) struct Props {
     #[prop_or_default]
-    pub onupdate: Option<Callback<app::Msg>>,
+    pub balls: lights::effects::Balls,
 
     #[prop_or_default]
-    pub children: Children,
+    pub onupdate: Option<Callback<lights::effects::Balls>>,
 }
 
 impl Component for Balls {
@@ -39,34 +35,56 @@ impl Component for Balls {
     type Properties = Props;
 
     fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
-        log::info!("Props: {:?}", props);
-        let balls = lights::effects::Balls::new(&[]);
-        Self {
-            link,
-            balls,
-            onupdate: props.onupdate,
-        }
+        Self { link, props }
     }
 
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
         match msg {
-            _ => todo!(),
+            Msg::SetBall(idx, ball) => self.props.balls.set_ball(idx, ball).expect("correct index"),
+            Msg::AddBall => self.props.balls.add_ball(),
         }
-        // self.onupdate.as_ref().map(|u| u.emit(app::msg::redraw));
-        // true
-    }
-
-    fn change(&mut self, props: Self::Properties) -> ShouldRender {
+        self.props
+            .onupdate
+            .as_ref()
+            .map(|u| u.emit(self.to_effect()));
         true
     }
 
-    fn view(&self) -> Html {
-        html! {
-            <></>
-        }
+    fn change(&mut self, props: Self::Properties) -> ShouldRender {
+        self.props.neq_assign(props)
     }
 
-    fn rendered(&mut self, _first_render: bool) {}
+    fn view(&self) -> Html {
+        let inner: Vec<_> = self
+            .props
+            .balls
+            .balls()
+            .iter()
+            .enumerate()
+            .map(|(idx, b)| {
+                html! {
+                    <>
+                        <h4>{ format!("#{}", idx) }</h4>
+                        <super::Ball
+                            ball = { b.clone() }
+                            onupdate = { Some(self.link.callback(move |ball| {
+                                Msg::SetBall(idx, ball)
+                            })) }
+                         />
+                        // Need the delete button
+                    </>
+                }
+            })
+            .collect();
+        let add_button = Button::new().label("+");
+        let add_button = add_button.on_click(self.link.callback(move |_| Msg::AddBall));
 
-    fn destroy(&mut self) {}
+        html! {
+            <>
+                <h1>{ "Balls" }</h1>
+                { inner }
+                { add_button }
+            </>
+        }
+    }
 }
