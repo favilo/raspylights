@@ -1,6 +1,6 @@
 use crate::components;
 
-use lights::effects::{Ball, Balls, Composite, Effect, EffectType, Glow};
+use lights::effects::{Ball, Balls, Composite, Glow};
 use yew::{html::IntoPropValue, prelude::*};
 
 pub fn view_empty() -> Html {

@@ -81,6 +81,16 @@ impl EffectType {
             _ => Default::default(),
         }
     }
+
+    pub fn render(&mut self, controller: &mut [LinSrgb<u8>], t: Instant) -> Result<Duration> {
+        match self {
+            EffectType::Empty => Empty.render(controller, t),
+            EffectType::Ball(b) => b.render(controller, t),
+            EffectType::Balls(bs) => bs.render(controller, t),
+            EffectType::Glow(g) => g.render(controller, t),
+            EffectType::Composite(c) => c.render(controller, t),
+        }
+    }
 }
 
 impl Default for EffectType {
@@ -294,7 +304,7 @@ impl Default for Ball {
         Self {
             color: LinSrgb::new(255, 0, 0),
             position: 0,
-            count: 0,
+            count: 1,
             direction: 1,
             bounce: false,
             delay: Duration::from_millis(100),
@@ -305,9 +315,12 @@ impl Default for Ball {
 
 impl Effect for Ball {
     fn render(&mut self, pixels: &mut [LinSrgb<u8>], t: Instant) -> Result<Duration> {
+        if self.count != pixels.len() {
+            self.count = pixels.len();
+        }
         if self.is_ready(t) {
             self.update_state();
-            let pixel = (self.position as isize + self.direction as isize) as usize % self.count;
+            let pixel = (self.position as isize + self.direction as isize) as usize % pixels.len();
             self.position = pixel;
             self.next_update = Some(t + self.delay);
         }

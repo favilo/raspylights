@@ -1,10 +1,18 @@
 use std::str::FromStr;
 
-use lights::effects::{Ball, Balls, Composite, Effect, EffectType, Empty, Glow};
-use serde::{Deserialize, Serialize};
+use lights::{
+    details::Details,
+    effects::{Effect, EffectType},
+};
+use serde_json::json;
 use yew::{
+    format::{Json, Nothing},
     prelude::*,
-    services::storage::{Area, StorageService},
+    services::{
+        fetch::{FetchTask, Request, Response},
+        storage::{Area, StorageService},
+        FetchService,
+    },
 };
 
 use crate::{
@@ -21,22 +29,27 @@ pub struct App {
     model: Model,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Debug)]
 struct Model {
-    effect_type: EffectType,
+    details: Details,
+    task: Option<FetchTask>,
 }
 
 impl Default for Model {
     fn default() -> Self {
         Self {
-            effect_type: EffectType::Empty,
+            details: Default::default(),
+            task: None,
         }
     }
 }
 
 pub enum Msg {
-    SetType(EffectType),
-    SetEffect(Box<dyn Effect>),
+    Type(EffectType),
+    Effect(Box<dyn Effect>),
+    Length(usize),
+    FetchLength(usize),
+    PostStatus(Details),
 }
 
 impl Component for App {
@@ -46,7 +59,7 @@ impl Component for App {
 
     fn create(_: Self::Properties, link: ComponentLink<Self>) -> Self {
         let storage = StorageService::new(Area::Local).unwrap();
-        let model = Self::load_model(&storage);
+        let model = Self::load_model(&storage, &link).unwrap_or_default();
 
         App {
             link,
@@ -57,20 +70,42 @@ impl Component for App {
 
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
         log::info!("App update called");
-        match msg {
-            Msg::SetType(t) => {
+        let store = match msg {
+            Msg::Type(t) => {
                 // Used for when we click the title
-                self.model.effect_type = self.load_last_effect(t.name())
+                self.model.details.effect = self.load_last_effect(t.name());
+                true
             }
-            Msg::SetEffect(effect) => {
+            Msg::Effect(effect) => {
                 // Used to update the effect
                 let effect_type = effect.to_cloned_type();
                 self.store_last_effect(&effect_type);
-                self.model.effect_type = effect_type;
+                self.model.details.effect = effect_type;
+                true
             }
+            Msg::FetchLength(l) => {
+                self.model.details.length = l;
+                self.model.task = None;
+                log::info!("Length found {}", l);
+                false
+            }
+            Msg::PostStatus(details) => {
+                self.model.task = None;
+                log::info!("Status: {:#?}", &details);
+                self.model.details = details;
+                false
+            }
+            Msg::Length(l) => {
+                self.model.details.length = l;
+                true
+            }
+        };
+
+        if store {
+            log::info!("Storing: {:?}", self.model.details);
+            self.store_current_effect();
         }
-        log::info!("Storing: {:?}", self.model.effect_type);
-        self.store_model();
+
         true
     }
 
@@ -83,6 +118,29 @@ impl Component for App {
         let effect = self.view_own_effect();
         html! {
             <>
+                // The layer of details
+                <div class="box" name="strip_details">
+                    <label for="strip_length">{ "Number of LEDs" }</label>
+                    <input type="number"
+                        name="strip_length"
+                        id="strip_length"
+                        value={ self.model.details.length.to_string() }
+                        onchange={
+                            self.link.callback(|c: ChangeData|{
+                                match c {
+                                    ChangeData::Value(v) => {
+                                        Msg::Length(v.parse().unwrap_or(100))
+                                    }
+                                    _ => {
+                                        log::error!("Wrong ChangeData type");
+                                        unreachable!("Should not have been possible for this input type")
+                                    }
+                                }
+                            })
+                        }
+                    />
+                </div>
+                // The effects
                 <div class="effect_select box">
                     { dropdown }
                     <div class="effect">{ effect }</div>
@@ -93,21 +151,56 @@ impl Component for App {
 }
 
 impl App {
-    fn load_model(storage: &StorageService) -> Model {
+    fn load_model(
+        storage: &StorageService,
+        link: &ComponentLink<Self>,
+    ) -> Result<Model, anyhow::Error> {
         let effect_str = storage.restore::<Result<String, anyhow::Error>>(EFFECT_KEY);
-        if let Ok(effect_str) = effect_str {
-            let effect: Result<Model, _> = serde_json::from_str(&effect_str);
+        let effect = if let Ok(effect_str) = effect_str {
+            let effect: Result<EffectType, _> = serde_json::from_str(&effect_str);
             log::info!("Loading: {:?}", effect);
             effect.unwrap_or_else(|_| Default::default())
         } else {
             Default::default()
-        }
+        };
+        let req = Request::get("details")
+            .body(Nothing)
+            .expect("Need to get a length response");
+        let callback = link.callback(move |response: Response<Json<anyhow::Result<Details>>>| {
+            log::info!("{:#?}", response);
+            let Json(data) = response.into_body();
+            Msg::FetchLength(data.map(|d| d.length).unwrap_or(100))
+        });
+        let task = FetchService::fetch(req, callback).expect("Request shouldn't fail");
+
+        Ok(Model {
+            details: Details {
+                effect,
+                length: 1,
+                brightness: 255,
+            },
+            task: Some(task),
+        })
     }
 
-    fn store_model(&mut self) {
+    fn store_current_effect(&mut self) {
         let model: &Model = &self.model;
-        let s: String = serde_json::to_string(model).unwrap();
+        let s: String = serde_json::to_string(&model.details.effect).unwrap();
         self.storage.store(EFFECT_KEY, Ok(s));
+        let details = model.details.clone();
+        let json = json!(&details);
+        let req = Request::post("details")
+            .body(Json(&json))
+            .expect("Json of effect_type");
+        let callback =
+            self.link
+                .callback(move |response: Response<Json<anyhow::Result<Details>>>| {
+                    let Json(jsvalue) = response.into_body();
+                    let details = jsvalue.unwrap_or(details.clone());
+                    Msg::PostStatus(details)
+                });
+        let task = FetchService::fetch(req, callback).expect("Need this to go through");
+        self.model.task = Some(task);
     }
 
     fn load_last_effect(&mut self, ty: &str) -> EffectType {
@@ -134,29 +227,29 @@ impl App {
         html! {
             <components::Selector
                 id = { "main" }
-                ty = { self.model.effect_type.name() }
+                ty = { self.model.details.effect.name() }
                 onclick = { Some(self.link.callback(|ty| {
-                    Msg::SetType(EffectType::from_str(ty).expect("Don't pass wrong type"))
+                    Msg::Type(EffectType::from_str(ty).expect("Don't pass wrong type"))
                 })) }
             />
         }
     }
 
     fn view_own_effect(&self) -> Html {
-        self.view_effect(&self.model.effect_type)
+        self.view_effect(&self.model.details.effect)
     }
 
     fn view_effect(&self, t: &EffectType) -> Html {
         match t {
             EffectType::Empty => view_empty(),
-            EffectType::Ball(b) => view_ball(&b, &self.link, |ball| Msg::SetEffect(Box::new(ball))),
+            EffectType::Ball(b) => view_ball(&b, &self.link, |ball| Msg::Effect(Box::new(ball))),
             EffectType::Balls(bs) => {
-                view_balls(&bs, &self.link, |balls| Msg::SetEffect(Box::new(balls)))
+                view_balls(&bs, &self.link, |balls| Msg::Effect(Box::new(balls)))
             }
-            EffectType::Glow(g) => view_glow(&g, &self.link, |g| Msg::SetEffect(Box::new(g))),
+            EffectType::Glow(g) => view_glow(&g, &self.link, |g| Msg::Effect(Box::new(g))),
             EffectType::Composite(c) => {
-                view_composite(&c, &self.link, |c| Msg::SetEffect(Box::new(c)))
-            } // EffectType::Rainbow => todo!(),
+                view_composite(&c, &self.link, |c| Msg::Effect(Box::new(c)))
+            } // EffectType::Rainbow(r) => todo!(),
         }
     }
 }
