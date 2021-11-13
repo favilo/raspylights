@@ -51,17 +51,6 @@ impl LedStrip {
             .build()?)
     }
 
-    pub fn set_length(&mut self, length: usize) -> Result<()> {
-        self.details.length = length;
-        self.pixels = vec![LinSrgb::new(0, 0, 0); length];
-        #[cfg(target_arch = "arm")]
-        {
-            let _ = self.cont.take();
-            self.cont = Some(Self::construct_controller(length, self.details.brightness)?);
-        }
-        Ok(())
-    }
-
     pub fn len(&self) -> usize {
         self.pixels.len()
     }
@@ -101,6 +90,20 @@ impl LedStrip {
 
     pub fn set_effect(&mut self, effect: EffectType) -> Result<()> {
         self.details.effect = effect;
+        Ok(())
+    }
+
+    pub fn set_length(&mut self, length: usize) -> Result<()> {
+        if self.details.length == length {
+            return Ok(());
+        }
+        self.details.length = length;
+        self.pixels = vec![LinSrgb::new(0, 0, 0); length];
+        #[cfg(target_arch = "arm")]
+        {
+            let _ = self.cont.take();
+            self.cont = Some(Self::construct_controller(length, self.details.brightness)?);
+        }
         Ok(())
     }
 }

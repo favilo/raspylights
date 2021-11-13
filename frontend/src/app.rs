@@ -1,9 +1,4 @@
-use std::str::FromStr;
-
-use lights::{
-    details::Details,
-    effects::{Effect, EffectType},
-};
+use lights::{details::Details, effects::EffectType};
 use serde_json::json;
 use yew::{
     format::{Json, Nothing},
@@ -46,7 +41,7 @@ impl Default for Model {
 
 pub enum Msg {
     Type(EffectType),
-    Effect(Box<dyn Effect>),
+    EffectName(&'static str),
     Length(usize),
     FetchLength(usize),
     PostStatus(Details),
@@ -69,18 +64,17 @@ impl Component for App {
     }
 
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
-        log::info!("App update called");
+        log::debug!("App update called");
         let store = match msg {
             Msg::Type(t) => {
                 // Used for when we click the title
-                self.model.details.effect = self.load_last_effect(t.name());
+                self.store_last_effect(&t);
+                self.model.details.effect = t;
                 true
             }
-            Msg::Effect(effect) => {
-                // Used to update the effect
-                let effect_type = effect.to_cloned_type();
-                self.store_last_effect(&effect_type);
-                self.model.details.effect = effect_type;
+            Msg::EffectName(name) => {
+                // Used for when we click the title
+                self.model.details.effect = self.load_last_effect(name);
                 true
             }
             Msg::FetchLength(l) => {
@@ -91,7 +85,7 @@ impl Component for App {
             }
             Msg::PostStatus(details) => {
                 self.model.task = None;
-                log::info!("Status: {:#?}", &details);
+                log::debug!("Status: {:#?}", &details);
                 self.model.details = details;
                 false
             }
@@ -102,7 +96,7 @@ impl Component for App {
         };
 
         if store {
-            log::info!("Storing: {:?}", self.model.details);
+            log::debug!("Storing: {:?}", self.model.details);
             self.store_current_effect();
         }
 
@@ -224,13 +218,12 @@ impl App {
     }
 
     fn view_selector(&self) -> Html {
+        let onclick = Some(self.link.callback(|ty| Msg::EffectName(ty)));
         html! {
             <components::Selector
                 id = { "main" }
                 ty = { self.model.details.effect.name() }
-                onclick = { Some(self.link.callback(|ty| {
-                    Msg::Type(EffectType::from_str(ty).expect("Don't pass wrong type"))
-                })) }
+                onclick = { onclick }
             />
         }
     }
@@ -241,15 +234,15 @@ impl App {
 
     fn view_effect(&self, t: &EffectType) -> Html {
         match t {
-            EffectType::Empty => view_empty(),
-            EffectType::Ball(b) => view_ball(&b, &self.link, |ball| Msg::Effect(Box::new(ball))),
-            EffectType::Balls(bs) => {
-                view_balls(&bs, &self.link, |balls| Msg::Effect(Box::new(balls)))
-            }
-            EffectType::Glow(g) => view_glow(&g, &self.link, |g| Msg::Effect(Box::new(g))),
+            EffectType::Empty(_) => view_empty(),
+            EffectType::Ball(b) => view_ball(&b, &self.link, |ball| Msg::Type(ball.into())),
+            EffectType::Balls(bs) => view_balls(&bs, &self.link, |balls| Msg::Type(balls.into())),
+            EffectType::Glow(g) => view_glow(&g, &self.link, |g| Msg::Type(g.into())),
             EffectType::Composite(c) => {
-                view_composite(&c, &self.link, |c| Msg::Effect(Box::new(c)))
-            } // EffectType::Rainbow(r) => todo!(),
+                view_composite(&c, &self.link, |c| Msg::Type(c.into()))
+            }
+            // TODO:
+            // EffectType::Rainbow(r) => todo!(),
         }
     }
 }

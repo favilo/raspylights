@@ -5,13 +5,15 @@ use std::{
 };
 
 use crate::error::{Error, Result};
+use enum_dispatch::enum_dispatch;
 use mopa::mopafy;
 use palette::{convert::FromColor, Gradient, Hsv, LinSrgb};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[enum_dispatch(Effect)]
 pub enum EffectType {
-    Empty,
+    Empty(Empty),
     Ball(Ball),
     Balls(Balls),
     Glow(Glow),
@@ -22,7 +24,7 @@ pub enum EffectType {
 impl EffectType {
     pub fn iter_names() -> impl Iterator<Item = &'static str> {
         [
-            Self::Empty.name(),
+            Self::Empty(Empty).name(),
             Self::Ball(Default::default()).name(),
             Self::Balls(Default::default()).name(),
             Self::Glow(Default::default()).name(),
@@ -33,7 +35,7 @@ impl EffectType {
 
     pub fn name(&self) -> &'static str {
         match self {
-            EffectType::Empty => "Empty",
+            EffectType::Empty(Empty) => "Empty",
             EffectType::Composite(_) => "Composite",
             EffectType::Ball(_) => "Ball",
             EffectType::Balls(_) => "Balls",
@@ -43,7 +45,7 @@ impl EffectType {
 
     pub fn into_inner(self) -> Box<dyn Effect> {
         match self {
-            EffectType::Empty => Box::new(Empty),
+            EffectType::Empty(Empty) => Box::new(Empty),
             EffectType::Composite(c) => Box::new(c),
             EffectType::Ball(b) => Box::new(b),
             EffectType::Balls(bs) => Box::new(bs),
@@ -51,9 +53,9 @@ impl EffectType {
         }
     }
 
-    pub fn inner_as_ref(&self) -> &dyn Effect {
+    pub fn inner_ref(&self) -> &dyn Effect {
         match self {
-            EffectType::Empty => &Empty,
+            EffectType::Empty(Empty) => &Empty,
             EffectType::Composite(c) => c,
             EffectType::Ball(b) => b,
             EffectType::Balls(bs) => bs,
@@ -61,19 +63,19 @@ impl EffectType {
         }
     }
 
-    pub fn to_inner_cloned(&self) -> Box<dyn Effect> {
+    pub fn inner_mut_ref(&mut self) -> &mut dyn Effect {
         match self {
-            EffectType::Empty => Box::new(Empty),
-            EffectType::Composite(c) => Box::new(c.clone()),
-            EffectType::Ball(b) => Box::new(b.clone()),
-            EffectType::Balls(bs) => Box::new(bs.clone()),
-            EffectType::Glow(g) => Box::new(g.clone()),
+            EffectType::Empty(e) => e,
+            EffectType::Composite(c) => c,
+            EffectType::Ball(b) => b,
+            EffectType::Balls(bs) => bs,
+            EffectType::Glow(g) => g,
         }
     }
 
     pub fn default_from_name(name: &str) -> Self {
         match name {
-            "Empty" => Self::Empty,
+            "Empty" => Self::Empty(Empty),
             "Ball" => Self::Ball(Default::default()),
             "Balls" => Self::Balls(Default::default()),
             "Glow" => Self::Glow(Default::default()),
@@ -84,7 +86,7 @@ impl EffectType {
 
     pub fn render(&mut self, controller: &mut [LinSrgb<u8>], t: Instant) -> Result<Duration> {
         match self {
-            EffectType::Empty => Empty.render(controller, t),
+            EffectType::Empty(Empty) => Empty.render(controller, t),
             EffectType::Ball(b) => b.render(controller, t),
             EffectType::Balls(bs) => bs.render(controller, t),
             EffectType::Glow(g) => g.render(controller, t),
@@ -95,7 +97,7 @@ impl EffectType {
 
 impl Default for EffectType {
     fn default() -> Self {
-        Self::Empty
+        Self::Empty(Empty)
     }
 }
 
@@ -104,7 +106,7 @@ impl FromStr for EffectType {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "Empty" => Ok(Self::Empty),
+            "Empty" => Ok(Self::Empty(Empty)),
             "Composite" => Ok(Self::Composite(Default::default())),
             "Ball" => Ok(Self::Ball(Default::default())),
             "Balls" => Ok(Self::Balls(Default::default())),
@@ -115,12 +117,12 @@ impl FromStr for EffectType {
     }
 }
 
+#[enum_dispatch]
 pub trait Effect:
     Debug + mopa::Any + serde_traitobject::Serialize + serde_traitobject::Deserialize
 {
     fn render(&mut self, controller: &mut [LinSrgb<u8>], t: Instant) -> Result<Duration>;
     fn is_ready(&self, t: Instant) -> bool;
-    fn into_type(self) -> EffectType;
 
     fn to_cloned_type(&self) -> EffectType;
 }
@@ -139,12 +141,8 @@ impl Effect for Empty {
         true
     }
 
-    fn into_type(self) -> EffectType {
-        EffectType::Empty
-    }
-
     fn to_cloned_type(&self) -> EffectType {
-        EffectType::Empty
+        EffectType::Empty(Empty)
     }
 }
 
@@ -153,20 +151,13 @@ pub struct Composite(Box<EffectType>, Box<EffectType>);
 
 impl Default for Composite {
     fn default() -> Self {
-        Self::new(Empty, Empty).expect("empty")
+        Self::new(EffectType::default(), EffectType::default()).expect("empty")
     }
 }
 
 impl Composite {
-    pub fn new<E, F>(first: E, second: F) -> Result<Self>
-    where
-        E: Effect,
-        F: Effect,
-    {
-        Ok(Self(
-            Box::new(first.into_type()),
-            Box::new(second.into_type()),
-        ))
+    pub fn new(first: EffectType, second: EffectType) -> Result<Self> {
+        Ok(Self(Box::new(first), Box::new(second)))
     }
 
     pub fn first(&self) -> &EffectType {
@@ -188,21 +179,17 @@ impl Composite {
 
 impl Effect for Composite {
     fn render(&mut self, controller: &mut [LinSrgb<u8>], t: Instant) -> Result<Duration> {
-        let d = self.0.to_inner_cloned().render(controller, t)?;
+        let d = self.0.inner_mut_ref().render(controller, t)?;
         Ok(std::cmp::min(
             d,
-            self.1.to_inner_cloned().render(controller, t)?,
+            self.1.inner_mut_ref().render(controller, t)?,
         ))
     }
 
     fn is_ready(&self, t: Instant) -> bool {
-        [self.0.inner_as_ref(), self.1.inner_as_ref()]
+        [self.0.inner_ref(), self.1.inner_ref()]
             .iter()
             .any(|e| e.is_ready(t))
-    }
-
-    fn into_type(self) -> EffectType {
-        EffectType::Composite(self)
     }
 
     fn to_cloned_type(&self) -> EffectType {
@@ -345,10 +332,6 @@ impl Effect for Ball {
         self.next_update.is_none() || t >= self.next_update.unwrap()
     }
 
-    fn into_type(self) -> EffectType {
-        EffectType::Ball(self)
-    }
-
     fn to_cloned_type(&self) -> EffectType {
         EffectType::Ball(self.clone())
     }
@@ -391,10 +374,6 @@ impl Effect for Balls {
 
     fn is_ready(&self, t: Instant) -> bool {
         self.0.iter().any(|b| b.is_ready(t))
-    }
-
-    fn into_type(self) -> EffectType {
-        EffectType::Balls(self)
     }
 
     fn to_cloned_type(&self) -> EffectType {
@@ -474,10 +453,6 @@ impl Effect for Glow {
 
     fn is_ready(&self, t: Instant) -> bool {
         self.next_update.map(|u| t >= u).unwrap_or(true)
-    }
-
-    fn into_type(self) -> EffectType {
-        EffectType::Glow(self)
     }
 
     fn to_cloned_type(&self) -> EffectType {

@@ -10,10 +10,11 @@ itertools = "0.10.1"
 lights = { path = "../lights" }
 log = "0.4.14"
 palette = "0.6.0"
-rs_ws281x = "*"
+rs_ws281x = "0.4.2"
 serde = { version = "1.0.126", features = ["derive"] }
 signal-hook = "0.3.9"
 async-std = "1.10.0"
+heed = { version = "0.11.0", features = ["mdbx", "serde-json"], default_features = false }
 
 [dependencies.tide]
 git = "https://github.com/http-rs/tide"

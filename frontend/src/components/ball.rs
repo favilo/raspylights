@@ -21,7 +21,7 @@ impl Ball {
 pub(crate) enum Msg {
     Color(LinSrgb<u8>),
     Pos(usize),
-    Count(usize),
+    // Count(usize),
     Direction(i8),
     Bounce(bool),
     Delay(u64),
@@ -52,9 +52,9 @@ impl Component for Ball {
             Msg::Pos(pos) => {
                 self.props.ball.position = pos;
             }
-            Msg::Count(count) => {
-                self.props.ball.count = count;
-            }
+            // Msg::Count(count) => {
+            //     self.props.ball.count = count;
+            // }
             Msg::Direction(direction) => {
                 self.props.ball.direction = direction;
             }
@@ -118,7 +118,26 @@ impl Component for Ball {
                 </p>
                 <p>
                     <label for="starting_point">{ "Starting Point:" }</label>
-                    <input type="number" value="0" id="starting_point" name="starting_point" />
+                <input type="number"
+                    value="0"
+                    id="starting_point"
+                    name="starting_point"
+                    onchange={
+                        self.link.callback(move |c| {
+                            match c {
+                                ChangeData::Value(v) => {
+                                    let pos = v.parse().unwrap_or(100);
+                                    Msg::Pos(pos)
+                                }
+                                _ => {
+                                    log::error!("Wong changedata type");
+                                    unreachable!("wrong changedata type?")
+                                }
+                            }
+
+                        })
+                    }
+                 />
                 </p>
                 <p>
                     <label for="behavior">{ "Behavior: " }</label>
