@@ -18,6 +18,10 @@ body {
   padding: 10pt;
 }
 
+label {
+  padding: 5pt;
+}
+
 .mdc-drawer {
   position: fixed;
 }

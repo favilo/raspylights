@@ -10,4 +10,7 @@ pub enum Error {
 
     #[error("Index out of range")]
     IndexOutOfRange,
+
+    #[error("Heed Error")]
+    HeedError,
 }

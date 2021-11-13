@@ -2,22 +2,41 @@ use std::time::Duration;
 use std::time::Instant;
 
 use anyhow::Result;
+use lights::{details::Details, effects::EffectType};
 use palette::LinSrgb;
+#[cfg(target_arch = "arm")]
 use rs_ws281x::{ChannelBuilder, Controller, ControllerBuilder, StripType};
 
-use lights::effects::Effect;
-
 pub struct LedStrip {
-    cont: Controller,
+    #[cfg(target_arch = "arm")]
+    cont: Option<Controller>,
 
     pixels: Vec<LinSrgb<u8>>,
-    effect: Box<dyn Effect>,
+    details: Details,
 }
 
 impl LedStrip {
-    pub fn new(length: usize, brightness: u8) -> Result<Self> {
+    pub fn new(details: Details) -> Result<Self> {
         // TODO: Get this customizable more
-        let cont = ControllerBuilder::new()
+        #[cfg(target_arch = "arm")]
+        let cont = Some(Self::construct_controller(
+            details.length,
+            details.brightness,
+        )?);
+        let pixels = vec![LinSrgb::new(0, 0, 0); details.length];
+
+        Ok(Self {
+            #[cfg(target_arch = "arm")]
+            cont,
+            pixels,
+
+            details: Default::default(),
+        })
+    }
+
+    #[cfg(target_arch = "arm")]
+    pub fn construct_controller(length: usize, brightness: u8) -> Result<Controller> {
+        Ok(ControllerBuilder::new()
             .freq(800_000)
             .dma(10)
             .channel(
@@ -29,15 +48,7 @@ impl LedStrip {
                     .brightness(brightness)
                     .build(),
             )
-            .build()?;
-        let pixels = vec![LinSrgb::new(0, 0, 0); length];
-
-        Ok(Self {
-            cont,
-            pixels,
-
-            effect: Box::new(lights::effects::Empty),
-        })
+            .build()?)
     }
 
     pub fn len(&self) -> usize {
@@ -56,22 +67,43 @@ impl LedStrip {
     }
 
     pub fn update(&mut self, now: Instant) -> std::result::Result<Duration, lights::error::Error> {
-        self.effect.render(&mut self.pixels, now)
+        self.details.effect.render(&mut self.pixels, now)
     }
 
+    #[cfg(target_arch = "arm")]
     pub fn render(&mut self) -> Result<()> {
-        let leds = self.cont.leds_mut(0);
+        debug_assert!(self.cont.is_some());
+        let leds = self.cont.as_mut().expect("can't be None").leds_mut(0);
         for (i, pixel) in self.pixels.iter().enumerate() {
             let (r, g, b) = pixel.into_components();
             leds[i] = [r, g, b, 0];
         }
-        self.cont.render()?;
+        self.cont.as_mut().expect("can't be None").render()?;
 
         Ok(())
     }
 
-    pub fn set_effect<E: Effect>(&mut self, effect: E) -> Result<()> {
-        self.effect = Box::new(effect);
+    #[cfg(not(target_arch = "arm"))]
+    pub fn render(&mut self) -> Result<()> {
+        Ok(())
+    }
+
+    pub fn set_effect(&mut self, effect: EffectType) -> Result<()> {
+        self.details.effect = effect;
+        Ok(())
+    }
+
+    pub fn set_length(&mut self, length: usize) -> Result<()> {
+        if self.details.length == length {
+            return Ok(());
+        }
+        self.details.length = length;
+        self.pixels = vec![LinSrgb::new(0, 0, 0); length];
+        #[cfg(target_arch = "arm")]
+        {
+            let _ = self.cont.take();
+            self.cont = Some(Self::construct_controller(length, self.details.brightness)?);
+        }
         Ok(())
     }
 }

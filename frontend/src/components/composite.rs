@@ -96,7 +96,7 @@ impl Component for Composite {
 impl Composite {
     fn view_effect(&self, t: &EffectType, first: bool) -> Html {
         match (t, first) {
-            (EffectType::Empty, _) => view_empty(),
+            (EffectType::Empty(_), _) => view_empty(),
             (EffectType::Ball(b), first) => {
                 if first {
                     view_ball(&b, &self.link, |ball| Msg::SetFirst(EffectType::Ball(ball)))

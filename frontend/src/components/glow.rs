@@ -1,4 +1,4 @@
-use palette::LinSrgb;
+// use palette::LinSrgb;
 
 use yew::prelude::*;
 use yewtil::NeqAssign;
@@ -11,7 +11,7 @@ pub(crate) struct Glow {
 }
 
 pub(crate) enum Msg {
-    Color(LinSrgb<u8>),
+    // Color(LinSrgb<u8>),
 }
 
 #[derive(Clone, PartialEq, Properties, Debug)]
@@ -31,7 +31,8 @@ impl Component for Glow {
         Self { link, props }
     }
 
-    fn update(&mut self, msg: Self::Message) -> ShouldRender {
+    fn update(&mut self, _msg: Self::Message) -> ShouldRender {
+        let _ = &self.link;
         todo!()
     }
 
