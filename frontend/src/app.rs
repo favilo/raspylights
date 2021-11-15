@@ -113,7 +113,8 @@ impl Component for App {
         html! {
             <>
                 // The layer of details
-                <div class="box" name="strip_details">
+                // <div class="box" name="strip_details">
+                <ybc::Box classes={ classes!("strip_details") }>
                     <label for="strip_length">{ "Number of LEDs" }</label>
                     <input type="number"
                         name="strip_length"
@@ -133,7 +134,7 @@ impl Component for App {
                             })
                         }
                     />
-                </div>
+                </ybc::Box>
                 // The effects
                 <div class="effect_select box">
                     { dropdown }

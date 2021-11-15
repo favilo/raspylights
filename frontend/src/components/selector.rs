@@ -1,6 +1,6 @@
 use lights::effects::EffectType;
 use yew::prelude::*;
-use yew_mdc_widgets::{MdcWidget, Tab, TabBar};
+// use yew_mdc_widgets::{MdcWidget, Tab, TabBar};
 
 #[derive(Clone, Debug)]
 pub(crate) struct Selector {
@@ -52,25 +52,34 @@ impl Component for Selector {
         let options: Vec<_> = effects
             .iter()
             .cloned()
-            .enumerate()
-            .map(|(idx, i)| -> Tab {
+            .map(|i| {
                 let id = format!("{}", i);
-                let mut t = Tab::new().label(id).tab_index(idx as isize);
-                if i == self.props.ty {
-                    t = t.active();
+                let classes = if i == self.props.ty {
+                    classes!("is-active")
+                } else {
+                    classes!()
+                };
+                html! {
+                    <li
+                        class={ classes }
+                        onclick={ self.link.callback(move |_| Msg::SetType(i)) }>
+                        <a>{id}</a>
+                    </li>
                 }
-                t.on_click(self.link.callback(move |_| Msg::SetType(i)))
             })
             .collect::<_>();
 
         let id_str = format!("effect_select_{}", self.props.id);
 
         html! {
-            <>
-                {
-                    TabBar::new().id(&id_str).tabs(options)
-                }
-            </>
+            <ybc::Tabs
+                classes={ classes!(&id_str, "is-center") }
+                fullwidth={ true }
+                boxed={ true }
+                rounded={ true }
+            >
+                { options }
+            </ybc::Tabs>
         }
     }
 }

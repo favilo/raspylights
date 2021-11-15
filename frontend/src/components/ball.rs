@@ -89,8 +89,8 @@ impl Component for Ball {
         html! {
             <>
                 <h1>{ "Ball" }</h1>
-                <p>
-                    <label for="ball_color">{ "Color: " }</label>
+                <ybc::Field>
+                    <label for="ball_color" class="label">{ "Color: " }</label>
                     <input type="color"
                         id={ "ball_color" }
                         name={ "ball_color" }
@@ -115,105 +115,114 @@ impl Component for Ball {
                             }
                         }) }
                     />
-                </p>
-                <p>
-                    <label for="starting_point">{ "Starting Point:" }</label>
-                <input type="number"
-                    value="0"
-                    id="starting_point"
-                    name="starting_point"
-                    onchange={
-                        self.link.callback(move |c| {
-                            match c {
-                                ChangeData::Value(v) => {
-                                    let pos = v.parse().unwrap_or(100);
-                                    Msg::Pos(pos)
+                </ybc::Field>
+                <ybc::Field>
+                    <label for="starting_point" class="label">
+                        { "Starting Point:" }
+                    </label>
+                    <input type="number"
+                        value="0"
+                        id="starting_point"
+                        name="starting_point"
+                        onchange={
+                            self.link.callback(move |c| {
+                                match c {
+                                    ChangeData::Value(v) => {
+                                        let pos = v.parse().unwrap_or(100);
+                                        Msg::Pos(pos)
+                                    }
+                                    _ => {
+                                        log::error!("Wong changedata type");
+                                        unreachable!("wrong changedata type?")
+                                    }
                                 }
-                                _ => {
-                                    log::error!("Wong changedata type");
-                                    unreachable!("wrong changedata type?")
-                                }
-                            }
 
-                        })
-                    }
-                 />
-                </p>
-                <p>
-                    <label for="behavior">{ "Behavior: " }</label>
-                    <input type="button"
-                        id="behavior"
-                        name="behavior"
-                        onclick={
-                            self.link.callback(move |_| {
-                                Msg::Bounce(!is_bounce)
                             })
                         }
-                        value={ behaviour }
                     />
-                </p>
-                <p>
-                    <label for="direction">{ "Direction: " }</label>
-                    <input type="button"
-                        id="direction"
-                        name="direction"
-                        onclick={
-                            self.link.callback(move |_| {
-                                Msg::Direction(ball_direction * -1)
-                            })
-                        }
-                        value={ direction }
-                    />
-                </p>
-                <p>
-                    <label for="delay">{ "Delay between movements: " }</label>
-                    <input type="range"
-                        min="10"
-                        max="1000"
-                        step="10"
-                        id="delay"
-                        name="delay"
-                        onchange={
-                            self.link.callback(move |ty| {
-                                let delay = match ty {
-                                    ChangeData::Value(s) => {
-                                        s.parse().unwrap_or(100)
-                                    }
-                                    _ => 100,
-                                };
-                                Msg::Delay(delay)
-                            })
-                        }
-                        oninput={
-                            self.link.callback(move |ty:InputData| {
-                                let delay = ty.value.parse().unwrap_or(100);
-                                Msg::Delay(delay)
-                            })
-                        }
-                        value= { self.props.ball.delay.as_millis().to_string() }
-                    />
-                    <input type="number" name="delay" id="delay_real"
-                        onchange={
-                            self.link.callback(move |ty| {
-                                let delay = match ty {
-                                    ChangeData::Value(s) => {
-                                        s.parse().unwrap_or(100)
-                                    }
-                                    _ => 100,
-                                };
-                                Msg::Delay(delay)
-                            })
-                        }
-                        oninput={
-                            self.link.callback(move |ty:InputData| {
-                                let delay = ty.value.parse().unwrap_or(100);
-                                Msg::Delay(delay)
-                            })
-                        }
-                        value= { self.props.ball.delay.as_millis().to_string() }
-                    />
-                    <span>{ "ms" }</span>
-                </p>
+                </ybc::Field>
+                <ybc::Field addons={ true }>
+                    <label for="behavior" class="label">{ "Behavior: " }</label>
+                    <ybc::Control>
+                        <input type="button"
+                            id="behavior"
+                            name="behavior"
+                            onclick={
+                                self.link.callback(move |_| {
+                                    Msg::Bounce(!is_bounce)
+                                })
+                            }
+                            value={ behaviour }
+                        />
+                    </ybc::Control>
+                </ybc::Field>
+                <ybc::Field addons={ true }>
+                    <label for="direction" class="label">{ "Direction: " }</label>
+                    <ybc::Control>
+                        <input type="button"
+                            id="direction"
+                            name="direction"
+                            onclick={
+                                self.link.callback(move |_| {
+                                    Msg::Direction(ball_direction * -1)
+                                })
+                            }
+                            value={ direction }
+                        />
+                    </ybc::Control>
+                </ybc::Field>
+                <ybc::Field addons={ true }>
+                    <label class="label">{ "Delay between movements: " }</label>
+                    <ybc::Control classes={ classes!("has-addons") }>
+                        <input type="range"
+                            class="input"
+                            min="10"
+                            max="1000"
+                            step="10"
+                            id="delay"
+                            name="delay"
+                            onchange={
+                                self.link.callback(move |ty| {
+                                    let delay = match ty {
+                                        ChangeData::Value(s) => {
+                                            s.parse().unwrap_or(100)
+                                        }
+                                        _ => 100,
+                                    };
+                                    Msg::Delay(delay)
+                                })
+                            }
+                            oninput={
+                                self.link.callback(move |ty:InputData| {
+                                    let delay = ty.value.parse().unwrap_or(100);
+                                    Msg::Delay(delay)
+                                })
+                            }
+                            value= { self.props.ball.delay.as_millis().to_string() }
+                        />
+                        <label>
+                            <input type="number" name="delay" id="delay_real" class="input"
+                                onchange={
+                                    self.link.callback(move |ty| {
+                                        let delay = match ty {
+                                            ChangeData::Value(s) => {
+                                                s.parse().unwrap_or(100)
+                                            }
+                                            _ => 100,
+                                        };
+                                        Msg::Delay(delay)
+                                    })
+                                }
+                                oninput={
+                                    self.link.callback(move |ty:InputData| {
+                                        let delay = ty.value.parse().unwrap_or(100);
+                                        Msg::Delay(delay)
+                                    })
+                                }
+                                value= { self.props.ball.delay.as_millis().to_string() }
+                            /><a class="button is-static">{ "ms" }</a></label>
+                    </ybc::Control>
+                </ybc::Field>
             </>
         }
     }
