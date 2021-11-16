@@ -1,4 +1,4 @@
-use std::time::Duration;
+use chrono::Duration;
 
 use palette::LinSrgb;
 
@@ -24,7 +24,7 @@ pub(crate) enum Msg {
     // Count(usize),
     Direction(i8),
     Bounce(bool),
-    Delay(u64),
+    Delay(i64),
 }
 
 #[derive(Clone, PartialEq, Properties, Debug)]
@@ -62,7 +62,7 @@ impl Component for Ball {
                 self.props.ball.bounce = bounce;
             }
             Msg::Delay(delay) => {
-                self.props.ball.delay = Duration::from_millis(delay);
+                self.props.ball.delay = Duration::milliseconds(delay);
             }
         }
         self.props
@@ -198,7 +198,7 @@ impl Component for Ball {
                                     Msg::Delay(delay)
                                 })
                             }
-                            value= { self.props.ball.delay.as_millis().to_string() }
+                            value= { self.props.ball.delay.num_milliseconds().to_string() }
                         />
                         <label>
                             <input type="number" name="delay" id="delay_real" class="input"
@@ -219,7 +219,7 @@ impl Component for Ball {
                                         Msg::Delay(delay)
                                     })
                                 }
-                                value= { self.props.ball.delay.as_millis().to_string() }
+                                value= { self.props.ball.delay.num_milliseconds().to_string() }
                             /><a class="button is-static">{ "ms" }</a></label>
                     </ybc::Control>
                 </ybc::Field>

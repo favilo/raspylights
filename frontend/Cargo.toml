@@ -39,6 +39,7 @@ yewtil = "0.4.0"
 reqwasm = "0.2.1"
 wasm-bindgen-futures = "0.4.28"
 ybc = "0.2.1"
+chrono = { version = "0.4.19", features = ["serde"] }
 
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = false

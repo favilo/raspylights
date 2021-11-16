@@ -7,7 +7,6 @@ use std::{
         Arc,
     },
     thread,
-    time::{Duration, Instant},
 };
 
 use anyhow::Result;
@@ -17,6 +16,7 @@ use async_std::{
     sync::{Mutex, RwLock},
     task,
 };
+use chrono::{Duration, Utc};
 use lights::{details::Details, effects, error::Error};
 use palette::LinSrgb;
 use signal_hook::consts;
@@ -48,14 +48,14 @@ async fn render_main(
             LinSrgb::new(0, 0, 255),
         ],
         50,
-        Duration::from_millis(50),
+        Duration::milliseconds(50),
     );
     let effect = effects::Composite::new(background.into(), effect.into())?;
     strip.set_effect(effect.into())?;
 
     loop {
         strip.clear()?;
-        let now = Instant::now();
+        let start = Utc::now();
 
         if term.load(Ordering::Relaxed) {
             break;
@@ -74,10 +74,16 @@ async fn render_main(
                 .await
                 .map_err(|_| Error::HeedError)?;
         }
-        let d = strip.update(now)?;
+        let d = strip.update(start)?;
         strip.render()?;
 
-        task::sleep(d - now.elapsed()).await;
+        task::sleep(std::time::Duration::from_millis(
+            (d - start.signed_duration_since(Utc::now()))
+                .num_milliseconds()
+                .try_into()
+                .unwrap(),
+        ))
+        .await;
     }
 
     strip.render()?;
@@ -117,7 +123,7 @@ async fn web_main(
 ) -> Result<()> {
     let die = async {
         loop {
-            task::sleep(Duration::from_millis(50)).await;
+            task::sleep(std::time::Duration::from_millis(50)).await;
             if term.load(Ordering::Relaxed) {
                 break;
             }

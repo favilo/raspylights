@@ -1,14 +1,14 @@
-use std::{
-    fmt::Debug,
-    str::FromStr,
-    time::{Duration, Instant},
-};
+use std::{fmt::Debug, str::FromStr};
 
 use crate::error::{Error, Result};
+use chrono::{serde::ts_milliseconds_option, DateTime, Duration, Utc};
 use enum_dispatch::enum_dispatch;
 use mopa::mopafy;
 use palette::{convert::FromColor, Gradient, Hsv, LinSrgb};
 use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, DurationMilliSeconds};
+
+type Instant = DateTime<Utc>;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[enum_dispatch(Effect)]
@@ -84,13 +84,13 @@ impl EffectType {
         }
     }
 
-    pub fn render(&mut self, controller: &mut [LinSrgb<u8>], t: Instant) -> Result<Duration> {
+    pub fn render(&mut self, pixels: &mut [LinSrgb<u8>], t: Instant) -> Result<Duration> {
         match self {
-            EffectType::Empty(Empty) => Empty.render(controller, t),
-            EffectType::Ball(b) => b.render(controller, t),
-            EffectType::Balls(bs) => bs.render(controller, t),
-            EffectType::Glow(g) => g.render(controller, t),
-            EffectType::Composite(c) => c.render(controller, t),
+            EffectType::Empty(Empty) => Empty.render(pixels, t),
+            EffectType::Ball(b) => b.render(pixels, t),
+            EffectType::Balls(bs) => bs.render(pixels, t),
+            EffectType::Glow(g) => g.render(pixels, t),
+            EffectType::Composite(c) => c.render(pixels, t),
         }
     }
 }
@@ -121,7 +121,7 @@ impl FromStr for EffectType {
 pub trait Effect:
     Debug + mopa::Any + serde_traitobject::Serialize + serde_traitobject::Deserialize
 {
-    fn render(&mut self, controller: &mut [LinSrgb<u8>], t: Instant) -> Result<Duration>;
+    fn render(&mut self, pixels: &mut [LinSrgb<u8>], t: Instant) -> Result<Duration>;
     fn is_ready(&self, t: Instant) -> bool;
 
     fn to_cloned_type(&self) -> EffectType;
@@ -133,8 +133,8 @@ mopafy!(Effect);
 pub struct Empty;
 
 impl Effect for Empty {
-    fn render(&mut self, _controller: &mut [LinSrgb<u8>], _t: Instant) -> Result<Duration> {
-        Ok(Duration::from_millis(100))
+    fn render(&mut self, _pixels: &mut [LinSrgb<u8>], _t: Instant) -> Result<Duration> {
+        Ok(Duration::milliseconds(100))
     }
 
     fn is_ready(&self, _t: Instant) -> bool {
@@ -178,12 +178,9 @@ impl Composite {
 }
 
 impl Effect for Composite {
-    fn render(&mut self, controller: &mut [LinSrgb<u8>], t: Instant) -> Result<Duration> {
-        let d = self.0.inner_mut_ref().render(controller, t)?;
-        Ok(std::cmp::min(
-            d,
-            self.1.inner_mut_ref().render(controller, t)?,
-        ))
+    fn render(&mut self, pixels: &mut [LinSrgb<u8>], t: Instant) -> Result<Duration> {
+        let d = self.0.inner_mut_ref().render(pixels, t)?;
+        Ok(std::cmp::min(d, self.1.inner_mut_ref().render(pixels, t)?))
     }
 
     fn is_ready(&self, t: Instant) -> bool {
@@ -197,6 +194,7 @@ impl Effect for Composite {
     }
 }
 
+#[serde_as]
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Ball {
     pub color: LinSrgb<u8>,
@@ -205,8 +203,9 @@ pub struct Ball {
     pub direction: i8,
     pub bounce: bool,
 
+    #[serde_as(as = "DurationMilliSeconds<i64>")]
     pub delay: Duration,
-    #[serde(with = "serde_millis")]
+    #[serde(with = "ts_milliseconds_option")]
     next_update: Option<Instant>,
 }
 
@@ -231,32 +230,32 @@ impl Ball {
         }
     }
 
-    pub fn wrap(color: LinSrgb<u8>, millis: u64, count: usize) -> Self {
-        Self::new(color, 0, 1, false, Duration::from_millis(millis), count)
+    pub fn wrap(color: LinSrgb<u8>, millis: i64, count: usize) -> Self {
+        Self::new(color, 0, 1, false, Duration::milliseconds(millis), count)
     }
 
-    pub fn wrap_backward(color: LinSrgb<u8>, millis: u64, count: usize) -> Self {
+    pub fn wrap_backward(color: LinSrgb<u8>, millis: i64, count: usize) -> Self {
         Self::new(
             color,
             count - 1,
             -1,
             false,
-            Duration::from_millis(millis),
+            Duration::milliseconds(millis),
             count,
         )
     }
 
-    pub fn bounce(color: LinSrgb<u8>, millis: u64, count: usize) -> Self {
-        Self::new(color, 0, 1, true, Duration::from_millis(millis), count)
+    pub fn bounce(color: LinSrgb<u8>, millis: i64, count: usize) -> Self {
+        Self::new(color, 0, 1, true, Duration::milliseconds(millis), count)
     }
 
-    pub fn bounce_backward(color: LinSrgb<u8>, millis: u64, count: usize) -> Self {
+    pub fn bounce_backward(color: LinSrgb<u8>, millis: i64, count: usize) -> Self {
         Self::new(
             color,
             count - 1,
             -1,
             true,
-            Duration::from_millis(millis),
+            Duration::milliseconds(millis),
             count,
         )
     }
@@ -294,7 +293,7 @@ impl Default for Ball {
             count: 1,
             direction: 1,
             bounce: false,
-            delay: Duration::from_millis(100),
+            delay: Duration::milliseconds(100),
             next_update: None,
         }
     }
@@ -315,14 +314,14 @@ impl Effect for Ball {
 
         let time_left = self
             .next_update
-            .map(|u| u.duration_since(t))
-            .unwrap_or(Duration::from_secs(0));
+            .map(|u| u.signed_duration_since(t))
+            .unwrap_or(Duration::seconds(0));
         if self.delay > time_left {
             Ok(self.delay
                 - self
                     .next_update
-                    .map(|u| u.duration_since(t))
-                    .unwrap_or(Duration::from_secs(0)))
+                    .map(|u| u.signed_duration_since(t))
+                    .unwrap_or(Duration::seconds(0)))
         } else {
             Ok(self.delay)
         }
@@ -360,10 +359,10 @@ impl Balls {
 }
 
 impl Effect for Balls {
-    fn render(&mut self, controller: &mut [LinSrgb<u8>], t: Instant) -> Result<Duration> {
-        let mut min = Duration::from_secs(1);
+    fn render(&mut self, pixels: &mut [LinSrgb<u8>], t: Instant) -> Result<Duration> {
+        let mut min = Duration::seconds(1);
         for ball in self.0.iter_mut() {
-            let d = ball.render(controller, t)?;
+            let d = ball.render(pixels, t)?;
             if d < min {
                 min = d;
             }
@@ -381,6 +380,7 @@ impl Effect for Balls {
     }
 }
 
+#[serde_as]
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Glow {
     colors: Vec<LinSrgb<u8>>,
@@ -389,8 +389,9 @@ pub struct Glow {
     step: usize,
     steps: usize,
 
+    #[serde_as(as = "DurationMilliSeconds<i64>")]
     delay: Duration,
-    #[serde(with = "serde_millis")]
+    #[serde(with = "ts_milliseconds_option")]
     next_update: Option<Instant>,
 }
 
@@ -411,7 +412,7 @@ impl Glow {
 
 impl Default for Glow {
     fn default() -> Self {
-        Self::new(vec![LinSrgb::new(0, 0, 0)], 1, Duration::from_millis(100))
+        Self::new(vec![LinSrgb::new(0, 0, 0)], 1, Duration::milliseconds(100))
     }
 }
 
@@ -441,7 +442,7 @@ impl Effect for Glow {
             *pixel = color;
         }
 
-        let time_left = self.next_update.map(|u| u.duration_since(t));
+        let time_left = self.next_update.map(|u| u.signed_duration_since(t));
         if time_left.is_none() {
             Ok(self.delay)
         } else if self.delay > time_left.unwrap() {

@@ -49,9 +49,6 @@ where
     Option<Callback<IN>>: IntoPropValue<Option<Callback<Glow>>>,
 {
     html! {
-        // <>
-        //     <h4> { "Glow" }</h4>
-        // </>
         <components::Glow
             glow = { glow.clone() }
             onupdate = { Some(link.callback(lambda)) }
