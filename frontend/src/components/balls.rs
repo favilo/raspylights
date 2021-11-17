@@ -18,6 +18,7 @@ impl Balls {
 pub(crate) enum Msg {
     SetBall(usize, lights::effects::Ball),
     AddBall,
+    RemoveBall(usize),
 }
 
 #[derive(Clone, PartialEq, Properties, Debug)]
@@ -42,6 +43,7 @@ impl Component for Balls {
         match msg {
             Msg::SetBall(idx, ball) => self.props.balls.set_ball(idx, ball).expect("correct index"),
             Msg::AddBall => self.props.balls.add_ball(),
+            Msg::RemoveBall(idx) => self.props.balls.remove_ball(idx),
         }
         self.props
             .onupdate
@@ -64,14 +66,23 @@ impl Component for Balls {
             .map(|(idx, b)| {
                 html! {
                     <>
-                        <h4>{ format!("#{}", idx) }</h4>
                         <super::Ball
                             ball = { b.clone() }
                             onupdate = { Some(self.link.callback(move |ball| {
                                 Msg::SetBall(idx, ball)
                             })) }
                          />
-                        // Need the delete button
+                        <ybc::Control>
+                            <input type="button"
+                                onclick={
+                                    self.link.callback(move |_| {
+                                        Msg::RemoveBall(idx)
+                                    })
+                                }
+                                value={ "-" }
+                            />
+                        </ybc::Control>
+                        <hr />
                     </>
                 }
             })
@@ -81,7 +92,6 @@ impl Component for Balls {
 
         html! {
             <>
-                <h1>{ "Balls" }</h1>
                 { inner }
                 { add_button }
             </>

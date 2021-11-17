@@ -109,6 +109,7 @@ impl Component for App {
 
     fn view(&self) -> Html {
         let dropdown = self.view_selector();
+        let preview = self.view_preview();
         let effect = self.view_own_effect();
         html! {
             <>
@@ -135,11 +136,14 @@ impl Component for App {
                         }
                     />
                 </ybc::Box>
+                <ybc::Box classes={ classes!("main_preview") }>
+                    { preview }
+                </ybc::Box>
                 // The effects
-                <div class="effect_select box">
+                <ybc::Box classes={ classes!("effect-select") }>
                     { dropdown }
                     <div class="effect">{ effect }</div>
-                </div>
+                </ybc::Box>
             </>
         }
     }
@@ -226,6 +230,15 @@ impl App {
                 ty = { self.model.details.effect.name() }
                 onclick = { onclick }
             />
+        }
+    }
+
+    fn view_preview(&self) -> Html {
+        html! {
+            <components::Preview
+                length = { self.model.details.length }
+                effect = { self.model.details.effect.clone() }
+             />
         }
     }
 

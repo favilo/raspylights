@@ -61,20 +61,6 @@ impl Component for Composite {
     fn view(&self) -> Html {
         html! {
             <>
-                <h1>{ "Composite" }</h1>
-                <div class="background box">
-                    <h2>{ "Background" }</h2>
-                    <div class="effect_select">
-                        <super::Selector
-                            id = { "first" }
-                            ty = { self.props.composite.first().name() }
-                            onclick = { Some(self.link.callback(|ty| {
-                                Msg::SetFirst(EffectType::from_str(ty).expect("Don't pass wrong type"))
-                            })) }
-                        />
-                    </div>
-                    { self.view_effect(self.props.composite.first(), true) }
-                </div>
                 <div class="foreground box">
                     <h2>{ "Foreground" }</h2>
                     <div class="effect_select">
@@ -87,6 +73,19 @@ impl Component for Composite {
                         />
                     </div>
                     { self.view_effect(self.props.composite.second(), false) }
+                </div>
+                <div class="background box">
+                    <h2>{ "Background" }</h2>
+                    <div class="effect_select">
+                        <super::Selector
+                            id = { "first" }
+                            ty = { self.props.composite.first().name() }
+                            onclick = { Some(self.link.callback(|ty| {
+                                Msg::SetFirst(EffectType::from_str(ty).expect("Don't pass wrong type"))
+                            })) }
+                        />
+                    </div>
+                    { self.view_effect(self.props.composite.first(), true) }
                 </div>
             </>
         }

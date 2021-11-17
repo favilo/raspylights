@@ -1,7 +1,5 @@
-use std::time::Duration;
-use std::time::Instant;
-
 use anyhow::Result;
+use chrono::{Duration, DateTime, Utc};
 use lights::{details::Details, effects::EffectType};
 use palette::LinSrgb;
 #[cfg(target_arch = "arm")]
@@ -66,7 +64,7 @@ impl LedStrip {
         Ok(())
     }
 
-    pub fn update(&mut self, now: Instant) -> std::result::Result<Duration, lights::error::Error> {
+    pub fn update(&mut self, now: DateTime<Utc>) -> std::result::Result<Duration, lights::error::Error> {
         self.details.effect.render(&mut self.pixels, now)
     }
 
