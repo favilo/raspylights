@@ -5,7 +5,7 @@ authors = ["Kevin Oberlies <favilo@gmail.com>"]
 edition = "2021"
 
 [dependencies]
-anyhow = "1.0.42"
+anyhow = { version  = "1.0.42", features = ["backtrace"] }
 itertools = "0.10.1"
 lights = { path = "../lights" }
 log = "0.4.14"

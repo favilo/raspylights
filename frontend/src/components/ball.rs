@@ -88,7 +88,6 @@ impl Component for Ball {
         let color = self.props.ball.color();
         html! {
             <>
-                <h1>{ "Ball" }</h1>
                 <ybc::Field>
                     <label for="ball_color" class="label">{ "Color: " }</label>
                     <input type="color"

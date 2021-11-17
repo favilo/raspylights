@@ -12,7 +12,7 @@ pub struct Details {
 impl Default for Details {
     fn default() -> Self {
         Self {
-            length: 1000,
+            length: 100,
             brightness: 255,
             effect: Default::default(),
         }

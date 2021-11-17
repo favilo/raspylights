@@ -317,11 +317,7 @@ impl Effect for Ball {
             .map(|u| u.signed_duration_since(t))
             .unwrap_or(Duration::seconds(0));
         if self.delay > time_left {
-            Ok(self.delay
-                - self
-                    .next_update
-                    .map(|u| u.signed_duration_since(t))
-                    .unwrap_or(Duration::seconds(0)))
+            Ok(self.delay - time_left)
         } else {
             Ok(self.delay)
         }
@@ -356,6 +352,10 @@ impl Balls {
         *self.0.get_mut(idx).ok_or(Error::IndexOutOfRange)? = ball;
         Ok(())
     }
+
+    pub fn remove_ball(&mut self, idx: usize) {
+        self.0.remove(idx);
+    }
 }
 
 impl Effect for Balls {
@@ -387,10 +387,10 @@ pub struct Glow {
     color_idx: usize,
     cur_color: LinSrgb<u8>,
     step: usize,
-    steps: usize,
+    pub steps: usize,
 
     #[serde_as(as = "DurationMilliSeconds<i64>")]
-    delay: Duration,
+    pub delay: Duration,
     #[serde(with = "ts_milliseconds_option")]
     next_update: Option<Instant>,
 }
@@ -408,11 +408,31 @@ impl Glow {
             next_update: None,
         }
     }
+
+    pub fn colors(&self) -> &[LinSrgb<u8>] {
+        &self.colors
+    }
+
+    pub fn set_color(&mut self, idx: usize, color: LinSrgb<u8>) {
+        self.colors[idx] = color;
+    }
+
+    pub fn add_color(&mut self, color: LinSrgb<u8>) {
+        self.colors.push(color);
+    }
+
+    pub fn remove_color(&mut self, idx: usize) {
+        self.colors.remove(idx);
+    }
 }
 
 impl Default for Glow {
     fn default() -> Self {
-        Self::new(vec![LinSrgb::new(0, 0, 0)], 1, Duration::milliseconds(100))
+        Self::new(
+            vec![LinSrgb::new(0, 0, 0), LinSrgb::new(255, 0, 0)],
+            10,
+            Duration::milliseconds(100),
+        )
     }
 }
 
