@@ -164,7 +164,7 @@ fn main() -> Result<()> {
     let (sender, receiver) = channel::bounded(1);
     let details = storage
         .load("main")
-        .map_err(|_| Error::HeedError)?
+        .expect("load failed")
         .unwrap_or_default();
     log::info!("Details loaded: {:#?}", details);
     let details = Arc::new(RwLock::new(details));
