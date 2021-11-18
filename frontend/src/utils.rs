@@ -1,6 +1,6 @@
 use crate::components;
 
-use lights::effects::{Ball, Balls, Composite, Glow};
+use lights::effects::{Ball, Balls, Composite, Glow, Rainbow};
 use yew::{html::IntoPropValue, prelude::*};
 
 pub fn view_empty() -> Html {
@@ -70,6 +70,25 @@ where
     html! {
         <components::Composite
             composite = { composite.clone() }
+            onupdate = { Some(link.callback(lambda)) }
+         />
+    }
+}
+
+pub fn view_rainbow<COMP, F, IN, M>(
+    rainbow: &Rainbow,
+    link: &ComponentLink<COMP>,
+    lambda: F,
+) -> Html
+where
+    COMP: Component,
+    F: Fn(IN) -> M + 'static,
+    M: Into<COMP::Message>,
+    Option<Callback<IN>>: IntoPropValue<Option<Callback<Rainbow>>>,
+{
+    html! {
+        <components::Rainbow
+            rainbow = { rainbow.clone() }
             onupdate = { Some(link.callback(lambda)) }
          />
     }

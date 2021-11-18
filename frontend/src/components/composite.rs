@@ -4,7 +4,7 @@ use lights::effects::EffectType;
 use yew::prelude::*;
 use yewtil::NeqAssign;
 
-use crate::utils::{view_ball, view_balls, view_composite, view_empty, view_glow};
+use crate::utils::{view_ball, view_balls, view_composite, view_empty, view_glow, view_rainbow};
 
 #[derive(Clone, Debug)]
 pub(crate) struct Composite {
@@ -135,7 +135,18 @@ impl Composite {
                         Msg::SetSecond(EffectType::Composite(composite))
                     })
                 }
-            } // EffectType::Rainbow => todo!(),
+            }
+            (EffectType::Rainbow(r), first) => {
+                if first {
+                    view_rainbow(&r, &self.link, |rainbow| {
+                        Msg::SetFirst(EffectType::Rainbow(rainbow))
+                    })
+                } else {
+                    view_rainbow(&r, &self.link, |rainbow| {
+                        Msg::SetSecond(EffectType::Rainbow(rainbow))
+                    })
+                }
+            }
         }
     }
 }

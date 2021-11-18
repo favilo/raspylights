@@ -12,7 +12,7 @@ use yew::{
 
 use crate::{
     components,
-    utils::{view_ball, view_balls, view_composite, view_empty, view_glow},
+    utils::{view_ball, view_balls, view_composite, view_empty, view_glow, view_rainbow},
 };
 
 const EFFECT_KEY: &str = "org.favil.raspylights.effect";
@@ -43,6 +43,7 @@ pub enum Msg {
     Type(EffectType),
     EffectName(&'static str),
     Length(usize),
+    Brightness(u8),
     FetchLength(usize),
     PostStatus(Details),
 }
@@ -67,7 +68,6 @@ impl Component for App {
         log::debug!("App update called");
         let store = match msg {
             Msg::Type(t) => {
-                // Used for when we click the title
                 self.store_last_effect(&t);
                 self.model.details.effect = t;
                 true
@@ -80,17 +80,19 @@ impl Component for App {
             Msg::FetchLength(l) => {
                 self.model.details.length = l;
                 self.model.task = None;
-                log::info!("Length found {}", l);
                 false
             }
             Msg::PostStatus(details) => {
                 self.model.task = None;
-                log::debug!("Status: {:#?}", &details);
                 self.model.details = details;
                 false
             }
             Msg::Length(l) => {
                 self.model.details.length = l;
+                true
+            }
+            Msg::Brightness(b) => {
+                self.model.details.brightness = b;
                 true
             }
         };
@@ -126,6 +128,25 @@ impl Component for App {
                                 match c {
                                     ChangeData::Value(v) => {
                                         Msg::Length(v.parse().unwrap_or(100))
+                                    }
+                                    _ => {
+                                        log::error!("Wrong ChangeData type");
+                                        unreachable!("Should not have been possible for this input type")
+                                    }
+                                }
+                            })
+                        }
+                    />
+                    <label for="strip_brightness">{ "Strip Brightness (0-255)" }</label>
+                    <input type="number"
+                        name="strip_brightness"
+                        id="strip_brightness"
+                        value={ self.model.details.brightness.to_string() }
+                        onchange={
+                            self.link.callback(|c: ChangeData|{
+                                match c {
+                                    ChangeData::Value(v) => {
+                                        Msg::Brightness(v.parse().unwrap_or(255))
                                     }
                                     _ => {
                                         log::error!("Wrong ChangeData type");
@@ -252,11 +273,8 @@ impl App {
             EffectType::Ball(b) => view_ball(&b, &self.link, |ball| Msg::Type(ball.into())),
             EffectType::Balls(bs) => view_balls(&bs, &self.link, |balls| Msg::Type(balls.into())),
             EffectType::Glow(g) => view_glow(&g, &self.link, |g| Msg::Type(g.into())),
-            EffectType::Composite(c) => {
-                view_composite(&c, &self.link, |c| Msg::Type(c.into()))
-            }
-            // TODO:
-            // EffectType::Rainbow(r) => todo!(),
+            EffectType::Composite(c) => view_composite(&c, &self.link, |c| Msg::Type(c.into())),
+            EffectType::Rainbow(r) => view_rainbow(&r, &self.link, |r| Msg::Type(r.into())),
         }
     }
 }

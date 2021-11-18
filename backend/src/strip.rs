@@ -1,5 +1,5 @@
 use anyhow::Result;
-use chrono::{Duration, DateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
 use lights::{details::Details, effects::EffectType};
 use palette::LinSrgb;
 #[cfg(target_arch = "arm")]
@@ -64,7 +64,10 @@ impl LedStrip {
         Ok(())
     }
 
-    pub fn update(&mut self, now: DateTime<Utc>) -> std::result::Result<Duration, lights::error::Error> {
+    pub fn update(
+        &mut self,
+        now: DateTime<Utc>,
+    ) -> std::result::Result<Duration, lights::error::Error> {
         self.details.effect.render(&mut self.pixels, now)
     }
 
@@ -101,6 +104,21 @@ impl LedStrip {
         {
             let _ = self.cont.take();
             self.cont = Some(Self::construct_controller(length, self.details.brightness)?);
+        }
+        Ok(())
+    }
+
+    pub fn set_brightness(&mut self, brightness: u8) -> Result<()> {
+        if self.details.brightness == brightness {
+            return Ok(());
+        }
+        self.details.brightness = brightness;
+        #[cfg(target_arch = "arm")]
+        {
+            // Explicityly drop the controller, to clean up pointers
+            let old_cont = self.cont.take();
+            drop(old_cont);
+            self.cont = Some(Self::construct_controller(self.details.length, brightness)?);
         }
         Ok(())
     }

@@ -66,6 +66,7 @@ async fn render_main(
             log::info!("We got some deets: {:#?}", deets);
             strip.set_effect(deets.effect.clone())?;
             strip.set_length(deets.length)?;
+            strip.set_brightness(deets.brightness)?;
             *details.write().await = deets.clone();
 
             // TODO: Make this function async, so we can await in a different thread
@@ -163,7 +164,7 @@ fn main() -> Result<()> {
     let (sender, receiver) = channel::bounded(1);
     let details = storage
         .load("main")
-        .map_err(|_| Error::HeedError)?
+        .expect("load failed")
         .unwrap_or_default();
     log::info!("Details loaded: {:#?}", details);
     let details = Arc::new(RwLock::new(details));

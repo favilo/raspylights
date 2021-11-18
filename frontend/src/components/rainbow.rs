@@ -5,15 +5,15 @@ use yew::prelude::*;
 use yewtil::NeqAssign;
 
 #[derive(Clone, Debug)]
-pub(crate) struct Glow {
+pub(crate) struct Rainbow {
     link: ComponentLink<Self>,
 
     props: Props,
 }
 
-impl Glow {
-    fn to_effect(&self) -> lights::effects::Glow {
-        self.props.glow.clone()
+impl Rainbow {
+    fn to_effect(&self) -> lights::effects::Rainbow {
+        self.props.rainbow.clone()
     }
 }
 
@@ -22,18 +22,18 @@ pub(crate) enum Msg {
     ReplaceColor(usize, LinSrgb<u8>),
     RemoveColor(usize),
     Delay(i64),
-    Steps(i64),
+    Direction,
 }
 
 #[derive(Clone, PartialEq, Properties, Debug)]
 pub(crate) struct Props {
     #[prop_or_default]
-    pub onupdate: Option<Callback<lights::effects::Glow>>,
+    pub onupdate: Option<Callback<lights::effects::Rainbow>>,
     #[prop_or_default]
-    pub glow: lights::effects::Glow,
+    pub rainbow: lights::effects::Rainbow,
 }
 
-impl Component for Glow {
+impl Component for Rainbow {
     type Message = Msg;
 
     type Properties = Props;
@@ -44,13 +44,11 @@ impl Component for Glow {
 
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
         match msg {
-            Msg::AddColor => self.props.glow.add_color(LinSrgb::new(255, 0, 0)),
-            Msg::ReplaceColor(idx, color) => self.props.glow.set_color(idx, color),
-            Msg::RemoveColor(idx) => self.props.glow.remove_color(idx),
-            Msg::Delay(delay) => {
-                self.props.glow.delay = Duration::milliseconds(delay);
-            }
-            Msg::Steps(steps) => self.props.glow.steps = steps as usize,
+            Msg::AddColor => self.props.rainbow.add_color(LinSrgb::new(255, 0, 0)),
+            Msg::ReplaceColor(idx, color) => self.props.rainbow.set_color(idx, color),
+            Msg::RemoveColor(idx) => self.props.rainbow.remove_color(idx),
+            Msg::Delay(delay) => self.props.rainbow.delay = Duration::milliseconds(delay),
+            Msg::Direction => self.props.rainbow.direction *= -1,
         };
         self.props
             .onupdate
@@ -65,7 +63,7 @@ impl Component for Glow {
 
     fn view(&self) -> Html {
         let link = self.link.clone();
-        let colors = self.props.glow.colors();
+        let colors = self.props.rainbow.colors();
         let colors = colors.iter().cloned().enumerate().map(|(idx, color)| {
             html! {
                 <ybc::Field>
@@ -105,9 +103,15 @@ impl Component for Glow {
             }
         });
 
+        let direction = if self.props.rainbow.direction == 1 {
+            "Forward"
+        } else {
+            "Backward"
+        };
+
         html! {
             <>
-                <div classes={ classes!("glow-colors") }>
+                <div classes={ classes!("rainbow-colors") }>
                     { for colors }
                     <ybc::Control>
                         <input type="button"
@@ -121,55 +125,18 @@ impl Component for Glow {
                     </ybc::Control>
                 </div>
                 <ybc::Field addons={ true }>
-                    <label class="label">{ "Steps between colors: " }</label>
-                    <ybc::Control classes={ classes!("has-addons") }>
-                        <input type="range"
-                            class="input"
-                            min="1"
-                            max="100"
-                            step="1"
-                            id="steps"
-                            name="steps"
-                            onchange={
-                                self.link.callback(move |ty| {
-                                    let steps = match ty {
-                                        ChangeData::Value(s) => {
-                                            s.parse().unwrap_or(10)
-                                        }
-                                        _ => 10,
-                                    };
-                                    Msg::Steps(steps)
+                    <label for="direction" class="label">{ "Direction: " }</label>
+                    <ybc::Control>
+                        <input type="button"
+                            id="direction"
+                            name="direction"
+                            onclick={
+                                self.link.callback(move |_| {
+                                    Msg::Direction
                                 })
                             }
-                            oninput={
-                                self.link.callback(move |ty:InputData| {
-                                    let steps = ty.value.parse().unwrap_or(10);
-                                    Msg::Steps(steps)
-                                })
-                            }
-                            value= { self.props.glow.steps.to_string() }
+                            value={ direction }
                         />
-                        <label>
-                            <input type="number" name="steps" id="steps_real" class="input"
-                                onchange={
-                                    self.link.callback(move |ty| {
-                                        let steps = match ty {
-                                            ChangeData::Value(s) => {
-                                                s.parse().unwrap_or(10)
-                                            }
-                                            _ => 10,
-                                        };
-                                        Msg::Steps(steps)
-                                    })
-                                }
-                                oninput={
-                                    self.link.callback(move |ty:InputData| {
-                                        let steps = ty.value.parse().unwrap_or(10);
-                                        Msg::Steps(steps)
-                                    })
-                                }
-                                value= { self.props.glow.steps.to_string() }
-                            /><a class="button is-static">{ "ms" }</a></label>
                     </ybc::Control>
                 </ybc::Field>
                 <ybc::Field addons={ true }>
@@ -199,7 +166,7 @@ impl Component for Glow {
                                     Msg::Delay(delay)
                                 })
                             }
-                            value= { self.props.glow.delay.num_milliseconds().to_string() }
+                            value= { self.props.rainbow.delay.num_milliseconds().to_string() }
                         />
                         <label>
                             <input type="number" name="delay" id="delay_real" class="input"
@@ -220,7 +187,7 @@ impl Component for Glow {
                                         Msg::Delay(delay)
                                     })
                                 }
-                                value= { self.props.glow.delay.num_milliseconds().to_string() }
+                                value= { self.props.rainbow.delay.num_milliseconds().to_string() }
                             /><a class="button is-static">{ "ms" }</a></label>
                     </ybc::Control>
                 </ybc::Field>
