@@ -1,4 +1,4 @@
-use std::{fmt::Debug, str::FromStr};
+use std::{fmt::Debug, iter, str::FromStr};
 
 use crate::error::{Error, Result};
 use chrono::{serde::ts_milliseconds_option, DateTime, Duration, Utc};
@@ -17,7 +17,7 @@ pub enum EffectType {
     Ball(Ball),
     Balls(Balls),
     Glow(Glow),
-    // Rainbow(Rainbow),
+    Rainbow(Rainbow),
     Composite(Composite),
 }
 
@@ -28,6 +28,7 @@ impl EffectType {
             Self::Ball(Default::default()).name(),
             Self::Balls(Default::default()).name(),
             Self::Glow(Default::default()).name(),
+            Self::Rainbow(Default::default()).name(),
             Self::Composite(Default::default()).name(),
         ]
         .into_iter()
@@ -40,6 +41,7 @@ impl EffectType {
             EffectType::Ball(_) => "Ball",
             EffectType::Balls(_) => "Balls",
             EffectType::Glow(_) => "Glow",
+            EffectType::Rainbow(_) => "Rainbow",
         }
     }
 
@@ -50,6 +52,7 @@ impl EffectType {
             EffectType::Ball(b) => Box::new(b),
             EffectType::Balls(bs) => Box::new(bs),
             EffectType::Glow(g) => Box::new(g),
+            EffectType::Rainbow(r) => Box::new(r),
         }
     }
 
@@ -60,6 +63,7 @@ impl EffectType {
             EffectType::Ball(b) => b,
             EffectType::Balls(bs) => bs,
             EffectType::Glow(g) => g,
+            EffectType::Rainbow(r) => r,
         }
     }
 
@@ -70,6 +74,7 @@ impl EffectType {
             EffectType::Ball(b) => b,
             EffectType::Balls(bs) => bs,
             EffectType::Glow(g) => g,
+            EffectType::Rainbow(r) => r,
         }
     }
 
@@ -79,6 +84,7 @@ impl EffectType {
             "Ball" => Self::Ball(Default::default()),
             "Balls" => Self::Balls(Default::default()),
             "Glow" => Self::Glow(Default::default()),
+            "Rainbow" => Self::Rainbow(Default::default()),
             "Composite" => Self::Composite(Default::default()),
             _ => Default::default(),
         }
@@ -91,6 +97,7 @@ impl EffectType {
             EffectType::Balls(bs) => bs.render(pixels, t),
             EffectType::Glow(g) => g.render(pixels, t),
             EffectType::Composite(c) => c.render(pixels, t),
+            EffectType::Rainbow(r) => r.render(pixels, t),
         }
     }
 }
@@ -111,7 +118,7 @@ impl FromStr for EffectType {
             "Ball" => Ok(Self::Ball(Default::default())),
             "Balls" => Ok(Self::Balls(Default::default())),
             "Glow" => Ok(Self::Glow(Default::default())),
-            // "Rainbow" => Ok(Self::Rainbow(Default::default())),
+            "Rainbow" => Ok(Self::Rainbow(Default::default())),
             _ => Err(Error::BadEffectType),
         }
     }
@@ -410,7 +417,7 @@ impl Glow {
     }
 
     pub fn colors(&self) -> &[LinSrgb<u8>] {
-        &self.colors
+        &self.colors[..]
     }
 
     pub fn set_color(&mut self, idx: usize, color: LinSrgb<u8>) {
@@ -463,12 +470,10 @@ impl Effect for Glow {
         }
 
         let time_left = self.next_update.map(|u| u.signed_duration_since(t));
-        if time_left.is_none() {
+        if time_left.is_none() || self.delay <= time_left.unwrap() {
             Ok(self.delay)
-        } else if self.delay > time_left.unwrap() {
-            Ok(self.delay - time_left.unwrap())
         } else {
-            Ok(self.delay)
+            Ok(self.delay - time_left.unwrap())
         }
     }
 
@@ -478,5 +483,112 @@ impl Effect for Glow {
 
     fn to_cloned_type(&self) -> EffectType {
         EffectType::Glow(self.clone())
+    }
+}
+
+#[serde_as]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct Rainbow {
+    colors: Vec<LinSrgb<u8>>,
+    pub strip_width: usize,
+    pub direction: i8,
+
+    step: usize,
+
+    #[serde_as(as = "DurationMilliSeconds<i64>")]
+    pub delay: Duration,
+    #[serde(with = "ts_milliseconds_option")]
+    next_update: Option<Instant>,
+}
+
+impl Rainbow {
+    pub fn new(
+        colors: Vec<LinSrgb<u8>>,
+        strip_width: usize,
+        direction: i8,
+        delay: Duration,
+    ) -> Self {
+        Self {
+            colors,
+            strip_width,
+            direction,
+            step: 0,
+            delay,
+            next_update: None,
+        }
+    }
+
+    pub fn colors(&self) -> &[LinSrgb<u8>] {
+        &self.colors[..]
+    }
+
+    pub fn set_color(&mut self, idx: usize, color: LinSrgb<u8>) {
+        self.colors[idx] = color;
+    }
+
+    pub fn add_color(&mut self, color: LinSrgb<u8>) {
+        self.colors.push(color);
+    }
+
+    pub fn remove_color(&mut self, idx: usize) {
+        self.colors.remove(idx);
+    }
+}
+
+impl Effect for Rainbow {
+    fn render(&mut self, pixels: &mut [LinSrgb<u8>], t: Instant) -> Result<Duration> {
+        let tmp: Vec<LinSrgb<u8>> = self
+            .colors
+            .iter()
+            .cloned()
+            .map(|c| iter::repeat(c).take(self.strip_width))
+            .flatten()
+            .cycle()
+            .take(pixels.len())
+            .collect::<Vec<_>>();
+
+        let len = pixels.len();
+        pixels[self.step..].copy_from_slice(&tmp[..len - self.step]);
+        pixels[..self.step].copy_from_slice(&tmp[len - self.step..]);
+
+        if self.is_ready(t) {
+            self.step =
+                (self.step as isize + (1 * self.direction as isize)) as usize % pixels.len();
+            self.next_update = Some(t + self.delay);
+        }
+
+        let time_left = self.next_update.map(|u| u.signed_duration_since(t));
+        if time_left.is_none() || self.delay <= time_left.unwrap() {
+            Ok(self.delay)
+        } else {
+            Ok(self.delay - time_left.unwrap())
+        }
+    }
+
+    fn is_ready(&self, t: Instant) -> bool {
+        self.next_update.map(|u| t >= u).unwrap_or(true)
+    }
+
+    fn to_cloned_type(&self) -> EffectType {
+        EffectType::Rainbow(self.clone())
+    }
+}
+
+impl Default for Rainbow {
+    fn default() -> Self {
+        Self::new(
+            vec![
+                LinSrgb::new(0xff, 0x00, 0x00),
+                LinSrgb::new(0xFF, 0x7F, 0x00),
+                LinSrgb::new(0xFF, 0xFF, 0x00),
+                LinSrgb::new(0x00, 0xFF, 0x00),
+                LinSrgb::new(0x00, 0x00, 0xFF),
+                LinSrgb::new(0x4B, 0x00, 0x82),
+                LinSrgb::new(0x94, 0x00, 0xD3),
+            ],
+            5,
+            1,
+            Duration::milliseconds(100),
+        )
     }
 }
