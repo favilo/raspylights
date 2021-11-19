@@ -4,6 +4,7 @@ mod storage;
 mod strip;
 
 use std::{
+    fs::File,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -18,9 +19,9 @@ use async_std::{
     sync::{Mutex, RwLock},
     task,
 };
-use chrono::{Duration, Utc};
-use lights::{details::Details, effects, error::Error};
-use palette::LinSrgb;
+use chrono::Utc;
+use daemonize::Daemonize;
+use lights::{details::Details, error::Error};
 use signal_hook::consts;
 use tide::{http::mime, log, prelude::*, Request, Response};
 
@@ -34,26 +35,7 @@ async fn render_main(
 ) -> Result<()> {
     let storage = Arc::new(Mutex::new(storage));
     let mut strip = LedStrip::new(details.read().await.clone())?;
-    let effect = effects::Balls::new(&[
-        effects::Ball::bounce(LinSrgb::new(255, 0, 0), 50, strip.len()),
-        effects::Ball::wrap(LinSrgb::new(0, 0, 255), 100, strip.len()),
-        effects::Ball::bounce_backward(LinSrgb::new(0, 255, 0), 50, strip.len()),
-        effects::Ball::wrap_backward(LinSrgb::new(255, 255, 0), 100, strip.len()),
-    ]);
-    let background = effects::Glow::new(
-        vec![
-            LinSrgb::new(0, 0, 0),
-            LinSrgb::new(255, 0, 0),
-            LinSrgb::new(0, 0, 0),
-            LinSrgb::new(0, 255, 0),
-            LinSrgb::new(0, 0, 0),
-            LinSrgb::new(0, 0, 255),
-        ],
-        50,
-        Duration::milliseconds(50),
-    );
-    let effect = effects::Composite::new(background.into(), effect.into())?;
-    strip.set_effect(effect.into())?;
+    strip.set_effect(details.read().await.effect.clone())?;
 
     loop {
         strip.clear()?;
@@ -148,6 +130,19 @@ async fn web_main(
 
 fn main() -> Result<()> {
     tide::log::start();
+
+    let stdout = File::create("/home/pi/raspylights.out").unwrap();
+    let stderr = File::create("/home/pi/raspylights.err").unwrap();
+
+    let daemonize = Daemonize::new()
+        .pid_file("/home/pi/raspylights.pid")
+        .working_directory("/home/pi")
+        .stdout(stdout)
+        .stderr(stderr);
+
+    // If we are running on arm, we want to be a daemon.
+    #[cfg(target_arch = "arm")]
+    daemonize.start()?;
 
     let term = Arc::new(AtomicBool::new(false));
     for sig in &[

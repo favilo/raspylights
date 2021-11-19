@@ -49,6 +49,7 @@ impl LedStrip {
             .build()?)
     }
 
+    #[allow(unused)]
     pub fn len(&self) -> usize {
         self.pixels.len()
     }
