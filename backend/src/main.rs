@@ -20,8 +20,9 @@ use async_std::{
     task,
 };
 use chrono::Utc;
+#[cfg(target_arch = "arm")]
 use daemonize::Daemonize;
-use lights::{details::Details, error::Error};
+use lights::{details::Details, effects::RuneScript, error::Error};
 use signal_hook::consts;
 use tide::{http::mime, log, prelude::*, Request, Response};
 
@@ -36,6 +37,9 @@ async fn render_main(
     let storage = Arc::new(Mutex::new(storage));
     let mut strip = LedStrip::new(details.read().await.clone())?;
     strip.set_effect(details.read().await.effect.clone())?;
+
+    let script = RuneScript::default();
+    // log::info!("Script: {:#?}", script);
 
     loop {
         strip.clear()?;
@@ -131,18 +135,20 @@ async fn web_main(
 fn main() -> Result<()> {
     tide::log::start();
 
-    let stdout = File::create("/home/pi/raspylights.out").unwrap();
-    let stderr = File::create("/home/pi/raspylights.err").unwrap();
-
-    let daemonize = Daemonize::new()
-        .pid_file("/home/pi/raspylights.pid")
-        .working_directory("/home/pi")
-        .stdout(stdout)
-        .stderr(stderr);
-
-    // If we are running on arm, we want to be a daemon.
     #[cfg(target_arch = "arm")]
-    daemonize.start()?;
+    {
+        let stdout = File::create("/home/pi/raspylights.out").unwrap();
+        let stderr = File::create("/home/pi/raspylights.err").unwrap();
+
+        let daemonize = Daemonize::new()
+            .pid_file("/home/pi/raspylights.pid")
+            .working_directory("/home/pi")
+            .stdout(stdout)
+            .stderr(stderr);
+
+        // If we are running on arm, we want to be a daemon.
+        daemonize.start()?;
+    }
 
     let term = Arc::new(AtomicBool::new(false));
     for sig in &[

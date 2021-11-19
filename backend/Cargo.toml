@@ -8,7 +8,6 @@ edition = "2021"
 anyhow = { version  = "1.0.42", features = ["backtrace"] }
 async-std = "1.10.0"
 chrono = "0.4.19"
-daemonize = "0.4.1"
 heed = { version = "0.11.0", features = ["mdbx", "serde-json"], default_features = false }
 # heed = { version = "0.11.0", features = ["lmdb", "serde-json"], default_features = false }
 itertools = "0.10.1"
@@ -25,4 +24,5 @@ git = "https://github.com/http-rs/tide"
 branch = "main"
 
 [target.'cfg(target_arch = "arm")'.dependencies]
+daemonize = "0.4.1"
 rs_ws281x = "0.4.2"
