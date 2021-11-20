@@ -1,5 +1,3 @@
-#![feature(backtrace)]
-
 mod storage;
 mod strip;
 
@@ -171,7 +169,7 @@ fn main() -> Result<()> {
     let details = Arc::new(RwLock::new(details));
     let details2 = Arc::clone(&details);
     let term2 = Arc::clone(&term);
-    let render = thread::spawn(|| {
+    let render = thread::spawn(move || {
         task::block_on(async {
             render_main(receiver, details, term2, storage)
                 .await

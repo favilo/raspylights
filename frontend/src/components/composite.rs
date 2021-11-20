@@ -147,6 +147,18 @@ impl Composite {
                     })
                 }
             }
+            (EffectType::RuneScript(s), first) => {
+                todo!()
+                // if first {
+                //     view_runescript(&r, &self.link, |runescript| {
+                //         Msg::SetFirst(EffectType::Runescript(runescript))
+                //     })
+                // } else {
+                //     view_runescript(&r, &self.link, |runescript| {
+                //         Msg::SetSecond(EffectType::Runescript(runescript))
+                //     })
+                // }
+            }
         }
     }
 }

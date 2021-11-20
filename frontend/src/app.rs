@@ -275,6 +275,7 @@ impl App {
             EffectType::Glow(g) => view_glow(&g, &self.link, |g| Msg::Type(g.into())),
             EffectType::Composite(c) => view_composite(&c, &self.link, |c| Msg::Type(c.into())),
             EffectType::Rainbow(r) => view_rainbow(&r, &self.link, |r| Msg::Type(r.into())),
+            EffectType::RuneScript(s) => todo!(),
         }
     }
 }

@@ -23,6 +23,9 @@ pub enum RuneError {
     #[error("Compilation Error: {0}")]
     Compilation(String),
 
+    #[error("No debug information")]
+    NoDebugInfo,
+
     #[error("Rune Error")]
     Rune(#[from] rune::Error),
 

@@ -22,17 +22,19 @@ pub enum EffectType {
     Glow(Glow),
     Rainbow(Rainbow),
     Composite(Composite),
+    RuneScript(RuneScript),
 }
 
 impl EffectType {
     pub fn iter_names() -> impl Iterator<Item = &'static str> {
         [
-            Self::Empty(Empty).name(),
-            Self::Ball(Default::default()).name(),
-            Self::Balls(Default::default()).name(),
-            Self::Glow(Default::default()).name(),
-            Self::Rainbow(Default::default()).name(),
-            Self::Composite(Default::default()).name(),
+            "Empty",
+            "Ball",
+            "Balls",
+            "Glow",
+            "Rainbow",
+            "Composite",
+            "Rune Script",
         ]
         .into_iter()
     }
@@ -45,6 +47,7 @@ impl EffectType {
             EffectType::Balls(_) => "Balls",
             EffectType::Glow(_) => "Glow",
             EffectType::Rainbow(_) => "Rainbow",
+            EffectType::RuneScript(_) => "Rune Script",
         }
     }
 
@@ -56,6 +59,7 @@ impl EffectType {
             EffectType::Balls(bs) => Box::new(bs),
             EffectType::Glow(g) => Box::new(g),
             EffectType::Rainbow(r) => Box::new(r),
+            EffectType::RuneScript(s) => Box::new(s),
         }
     }
 
@@ -67,6 +71,7 @@ impl EffectType {
             EffectType::Balls(bs) => bs,
             EffectType::Glow(g) => g,
             EffectType::Rainbow(r) => r,
+            EffectType::RuneScript(s) => s,
         }
     }
 
@@ -78,6 +83,7 @@ impl EffectType {
             EffectType::Balls(bs) => bs,
             EffectType::Glow(g) => g,
             EffectType::Rainbow(r) => r,
+            EffectType::RuneScript(s) => s,
         }
     }
 
@@ -89,6 +95,7 @@ impl EffectType {
             "Glow" => Self::Glow(Default::default()),
             "Rainbow" => Self::Rainbow(Default::default()),
             "Composite" => Self::Composite(Default::default()),
+            "Rune Script" => Self::RuneScript(Default::default()),
             _ => Default::default(),
         }
     }
@@ -101,6 +108,7 @@ impl EffectType {
             EffectType::Glow(g) => g.render(pixels, t),
             EffectType::Composite(c) => c.render(pixels, t),
             EffectType::Rainbow(r) => r.render(pixels, t),
+            EffectType::RuneScript(s) => s.render(pixels, t),
         }
     }
 }
