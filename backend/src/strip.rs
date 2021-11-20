@@ -13,6 +13,9 @@ pub struct LedStrip {
     details: Details,
 }
 
+// Just to make sure I don't try to send this anywhere
+impl !Send for LedStrip {}
+
 impl LedStrip {
     pub fn new(details: Details) -> Result<Self> {
         // TODO: Get this customizable more
