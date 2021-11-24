@@ -1,6 +1,6 @@
 use anyhow::anyhow;
 use chrono::{DateTime, Duration, NaiveDateTime, TimeZone, Utc};
-use lights::effects::EffectType;
+use lights::effects::{Effect, EffectType};
 use palette::LinSrgb;
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::HtmlCanvasElement;
@@ -29,6 +29,7 @@ pub(crate) struct Preview {
     pixels: Vec<LinSrgb<u8>>,
     timer: Option<Box<TimeoutTask>>,
     canvas: NodeRef,
+    effect: Box<dyn Effect>,
 }
 
 impl Component for Preview {
@@ -38,15 +39,16 @@ impl Component for Preview {
 
     fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
         let pixels = vec![Default::default(); props.length];
+        let effect = props.effect.clone().into_inner();
         let mut this = Self {
             link,
             props,
             pixels,
+            effect,
             timer: None,
             canvas: Default::default(),
         };
         let dur = this
-            .props
             .effect
             .render(&mut this.pixels, now())
             .unwrap_or(Duration::milliseconds(50));
@@ -62,7 +64,6 @@ impl Component for Preview {
                     .for_each(|c| *c = LinSrgb::new(0, 0, 0));
                 self.timer = None;
                 let dur = self
-                    .props
                     .effect
                     .render(&mut self.pixels, t)
                     .unwrap_or(Duration::milliseconds(50));
@@ -84,7 +85,8 @@ impl Component for Preview {
         }
         if props.effect != self.props.effect {
             self.props.effect = props.effect;
-            let dur = self.props.effect.render(&mut self.pixels, now()).unwrap();
+            self.effect = self.props.effect.clone().into_inner();
+            let dur = self.effect.render(&mut self.pixels, now()).unwrap();
             self.set_timer(dur);
             changed = true;
         }

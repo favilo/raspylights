@@ -1,19 +1,23 @@
+mod types;
+
 use std::{
     collections::{HashMap, HashSet},
-    sync::{Arc, RwLock},
+    fmt::Display,
+    sync::Arc,
 };
 
+use chrono::TimeZone;
 use once_cell::sync::Lazy;
 use rune::{termcolor::StandardStream, Diagnostics, EmitDiagnostics, Options, Sources};
-use runestick::{debug::DebugArgs, Component, Context, RuntimeContext, Source, Unit, Value, Vm};
+use runestick::{
+    debug::DebugArgs, Any, Component, Context, RuntimeContext, Source, Unit, Value, Vm,
+};
 
 use serde::{Deserialize, Serialize};
 
-use crate::error::RuneError;
+use crate::error::{Error, Result, RuneError};
 
 use super::{Effect, EffectType, Instant};
-
-pub type SourceCode = String;
 
 static REQUIRED_FNS: Lazy<HashMap<Component, DebugArgs>> = Lazy::new(|| {
     [
@@ -21,14 +25,14 @@ static REQUIRED_FNS: Lazy<HashMap<Component, DebugArgs>> = Lazy::new(|| {
         (
             "render",
             DebugArgs::Named(vec![
-                "self".to_string(),
+                "state".to_string(),
                 "pixels".to_string(),
                 "t".to_string(),
             ]),
         ),
         (
             "is_ready",
-            DebugArgs::Named(vec!["self".to_string(), "t".to_string()]),
+            DebugArgs::Named(vec!["state".to_string(), "t".to_string()]),
         ),
     ]
     .into_iter()
@@ -50,23 +54,21 @@ pub struct RuneScript {
     unit: Arc<Unit>,
 
     #[serde(skip)]
-    private_data: Arc<RwLock<Value>>,
+    private_data: Value,
 
     // TODO: Make this a new type that we control, for loading from the database
-    sourcecode: SourceCode,
+    pub(crate) sourcecode: SourceCode,
 }
-
-// Safety: We have a lock for any of the mutable state
-unsafe impl Send for RuneScript {}
-unsafe impl Sync for RuneScript {}
 
 impl RuneScript {
     pub fn from_source(sourcecode: SourceCode) -> Result<Self, RuneError> {
         // TODO: Figure out which functions and stuff we want to provide to Rune
-        let context = Context::with_default_modules()?;
+        let mut context = Context::with_default_modules()?;
+        context.install(&types::module()?)?;
+
         let options = Options::default();
         let mut sources = Sources::new();
-        sources.insert(Source::new("main", &sourcecode));
+        sources.insert(Source::new("main", &sourcecode.to_string()));
 
         let mut diagnostics = Diagnostics::new();
         let result = rune::load_sources(&context, &options, &mut sources, &mut diagnostics);
@@ -75,7 +77,7 @@ impl RuneScript {
             let mut writer = StandardStream::stderr(rune::termcolor::ColorChoice::Always);
             diagnostics.emit_diagnostics(&mut writer, &sources)?;
             // Ideally we won't get here, and I can just not make this more awesome.
-            return Err(RuneError::Compilation("Error compiling".into()));
+            return Err(RuneError::Compilation("Error compiling".into()).into());
         }
 
         let unit = result?;
@@ -92,7 +94,7 @@ impl RuneScript {
         if let Value::Object(ref o) = private_data {
             log::info!("private_data info: {:#?}", o);
         }
-        let private_data = Arc::new(RwLock::new(private_data));
+        let private_data = private_data;
 
         Ok(Self {
             unit,
@@ -148,29 +150,7 @@ impl RuneScript {
 
 impl Default for RuneScript {
     fn default() -> Self {
-        RuneScript::from_source(
-            r#"
-            struct Nothing;
-
-            impl Nothing {
-                fn render(self, pixels, t) {
-                    println("Running");
-                    //  Run again in 1 second
-                    1000
-                }
-
-                fn is_ready(self, t) {
-                    true
-                }
-            }
-
-            pub fn init() {
-                Nothing
-            }
-            "#
-            .to_owned(),
-        )
-        .unwrap()
+        RuneScript::from_source(SourceCode::default()).unwrap()
     }
 }
 
@@ -184,17 +164,81 @@ impl PartialEq for RuneScript {
 impl Effect for RuneScript {
     fn render(
         &mut self,
-        _pixels: &mut [palette::LinSrgb<u8>],
-        _t: super::Instant,
+        pixels: &mut [palette::LinSrgb<u8>],
+        t: super::Instant,
     ) -> crate::error::Result<chrono::Duration> {
-        todo!()
+        let vm = Vm::new(Arc::clone(&self.runtime), Arc::clone(&self.unit));
+        let state = &self.private_data;
+        let mut scrixels: types::Scrixels = pixels.into();
+
+        let dur = vm
+            .call(&["render"], (state, &mut scrixels, t.timestamp_millis()))
+            .map_err(RuneError::from)
+            .map_err(Error::from)?
+            .into_integer()
+            .map_err(RuneError::from)
+            .map_err(Error::from)?;
+        for (i, pixel) in pixels.iter_mut().enumerate() {
+            *pixel = scrixels.0[i].into();
+        }
+        Ok(chrono::Duration::milliseconds(dur))
     }
 
-    fn is_ready(&self, _t: Instant) -> bool {
-        todo!()
+    fn is_ready(&self, t: Instant) -> Result<bool> {
+        let vm = Vm::new(Arc::clone(&self.runtime), Arc::clone(&self.unit));
+        let state = &self.private_data;
+        let ready = vm
+            .call(&["is_ready"], (state, t.timestamp_millis()))
+            .map_err(RuneError::from)
+            .map_err(Error::from)?
+            .as_bool()
+            .map_err(RuneError::from)
+            .map_err(Error::from)?;
+        Ok(ready)
     }
 
     fn to_cloned_type(&self) -> EffectType {
-        EffectType::RuneScript(self.clone())
+        EffectType::RuneScript(self.sourcecode.clone())
+    }
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+pub enum SourceCode {
+    Source(String),
+}
+
+impl Display for SourceCode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SourceCode::Source(code) => write!(f, "{}", code),
+        }
+    }
+}
+
+impl Default for SourceCode {
+    fn default() -> Self {
+        Self::Source(
+            r#"
+            struct Ball {
+                pos,
+                next,
+            };
+
+            pub fn render(state, pixels, t) {
+                println(`Running ${pixels.len()}`);
+                //  Run again in 1 second
+                1000
+            }
+
+            pub fn is_ready(state, t) {
+                true
+            }
+
+            pub fn init() {
+                Ball {}
+            }
+            "#
+            .to_owned(),
+        )
     }
 }

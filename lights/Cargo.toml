@@ -8,8 +8,7 @@ edition = "2021"
 
 [dependencies]
 chrono = { version = "0.4.19", features = ["serde"] }
-enum-iterator = "0.6.0"
-enum_derive = "0.1.7"
+dyn-clone = "1.0.4"
 enum_dispatch = "0.3.7"
 itertools = "0.10.1"
 log = "0.4.14"
@@ -20,9 +19,7 @@ palette = { version = "0.6.0", features = ["serializing"] }
 rune = "0.9.1"
 runestick = "0.9.1"
 serde = { version = "1.0.126", features = ["derive"] }
-serde_millis = "0.1.1"
 serde_traitobject = "0.2.7"
 serde_with = {  version = "1.11.0", features = ["chrono"] }
-strum = { version = "0.21.0", features = ["derive"] }
 thiserror = "1.0.26"
-wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
+# wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }

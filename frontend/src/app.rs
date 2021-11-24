@@ -12,7 +12,9 @@ use yew::{
 
 use crate::{
     components,
-    utils::{view_ball, view_balls, view_composite, view_empty, view_glow, view_rainbow},
+    utils::{
+        view_ball, view_balls, view_composite, view_empty, view_glow, view_rainbow, view_runescript,
+    },
 };
 
 const EFFECT_KEY: &str = "org.favil.raspylights.effect";
@@ -44,7 +46,7 @@ pub enum Msg {
     EffectName(&'static str),
     Length(usize),
     Brightness(u8),
-    FetchLength(usize),
+    FetchDetails(usize, u8),
     PostStatus(Details),
 }
 
@@ -77,8 +79,9 @@ impl Component for App {
                 self.model.details.effect = self.load_last_effect(name);
                 true
             }
-            Msg::FetchLength(l) => {
+            Msg::FetchDetails(l, b) => {
                 self.model.details.length = l;
+                self.model.details.brightness = b;
                 self.model.task = None;
                 false
             }
@@ -189,15 +192,15 @@ impl App {
         let callback = link.callback(move |response: Response<Json<anyhow::Result<Details>>>| {
             log::info!("{:#?}", response);
             let Json(data) = response.into_body();
-            Msg::FetchLength(data.map(|d| d.length).unwrap_or(100))
+            let (l, b) = data.map(|d| (d.length, d.brightness)).unwrap_or((100, 150));
+            Msg::FetchDetails(l, b)
         });
         let task = FetchService::fetch(req, callback).expect("Request shouldn't fail");
 
         Ok(Model {
             details: Details {
                 effect,
-                length: 1,
-                brightness: 255,
+                ..Details::default()
             },
             task: Some(task),
         })
@@ -275,7 +278,9 @@ impl App {
             EffectType::Glow(g) => view_glow(&g, &self.link, |g| Msg::Type(g.into())),
             EffectType::Composite(c) => view_composite(&c, &self.link, |c| Msg::Type(c.into())),
             EffectType::Rainbow(r) => view_rainbow(&r, &self.link, |r| Msg::Type(r.into())),
-            EffectType::RuneScript(s) => todo!(),
+            EffectType::RuneScript(s) => {
+                view_runescript(&s, &self.link, |s| Msg::Type(EffectType::RuneScript(s)))
+            }
         }
     }
 }

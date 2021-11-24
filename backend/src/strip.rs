@@ -1,6 +1,9 @@
 use anyhow::Result;
 use chrono::{DateTime, Duration, Utc};
-use lights::{details::Details, effects::EffectType};
+use lights::{
+    details::Details,
+    effects::{Effect, EffectType, Empty},
+};
 use palette::LinSrgb;
 #[cfg(target_arch = "arm")]
 use rs_ws281x::{ChannelBuilder, Controller, ControllerBuilder, StripType};
@@ -11,6 +14,7 @@ pub struct LedStrip {
 
     pixels: Vec<LinSrgb<u8>>,
     details: Details,
+    effect: Box<dyn Effect>,
 }
 
 // Just to make sure I don't try to send this anywhere
@@ -25,13 +29,15 @@ impl LedStrip {
             details.brightness,
         )?);
         let pixels = vec![LinSrgb::new(0, 0, 0); details.length];
+        let effect = details.effect.clone().into_inner();
 
         Ok(Self {
             #[cfg(target_arch = "arm")]
             cont,
             pixels,
 
-            details: Default::default(),
+            details,
+            effect,
         })
     }
 
@@ -72,7 +78,7 @@ impl LedStrip {
         &mut self,
         now: DateTime<Utc>,
     ) -> std::result::Result<Duration, lights::error::Error> {
-        self.details.effect.render(&mut self.pixels, now)
+        self.effect.render(&mut self.pixels, now)
     }
 
     #[cfg(target_arch = "arm")]
@@ -94,7 +100,8 @@ impl LedStrip {
     }
 
     pub fn set_effect(&mut self, effect: EffectType) -> Result<()> {
-        self.details.effect = effect;
+        self.details.effect = effect.clone();
+        self.effect = effect.into_inner();
         Ok(())
     }
 

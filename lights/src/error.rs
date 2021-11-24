@@ -16,6 +16,9 @@ pub enum Error {
 
     #[error(transparent)]
     RuneError(#[from] RuneError),
+
+    #[error("Scripts not allowed in composite effects")]
+    CompositeScriptError,
 }
 
 #[derive(Debug, thiserror::Error)]

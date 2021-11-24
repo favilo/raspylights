@@ -43,10 +43,15 @@ impl Component for Composite {
     }
 
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
-        match msg {
+        let result = match msg {
             Msg::SetFirst(effect) => self.props.composite.set_first(effect),
             Msg::SetSecond(effect) => self.props.composite.set_second(effect),
+        };
+        if result.is_err() {
+            log::error!("Tried to set the wrong type");
+            return true;
         }
+
         self.props
             .onupdate
             .as_ref()
@@ -70,6 +75,7 @@ impl Component for Composite {
                             onclick = { Some(self.link.callback(|ty| {
                                 Msg::SetSecond(EffectType::from_str(ty).expect("Don't pass wrong type"))
                             })) }
+                            internal = true
                         />
                     </div>
                     { self.view_effect(self.props.composite.second(), false) }
@@ -83,6 +89,7 @@ impl Component for Composite {
                             onclick = { Some(self.link.callback(|ty| {
                                 Msg::SetFirst(EffectType::from_str(ty).expect("Don't pass wrong type"))
                             })) }
+                            internal = true
                         />
                     </div>
                     { self.view_effect(self.props.composite.first(), true) }
@@ -147,17 +154,12 @@ impl Composite {
                     })
                 }
             }
-            (EffectType::RuneScript(s), first) => {
-                todo!()
-                // if first {
-                //     view_runescript(&r, &self.link, |runescript| {
-                //         Msg::SetFirst(EffectType::Runescript(runescript))
-                //     })
-                // } else {
-                //     view_runescript(&r, &self.link, |runescript| {
-                //         Msg::SetSecond(EffectType::Runescript(runescript))
-                //     })
-                // }
+            _ => {
+                html! {
+                    <>
+                        <p> { "Unsupported type" } </p>
+                    </>
+                }
             }
         }
     }

@@ -2,6 +2,7 @@ mod rune;
 use std::{fmt::Debug, iter, str::FromStr};
 
 use chrono::{serde::ts_milliseconds_option, DateTime, Duration, Utc};
+use dyn_clone::DynClone;
 use enum_dispatch::enum_dispatch;
 use mopa::mopafy;
 use palette::{convert::FromColor, Gradient, Hsv, LinSrgb};
@@ -14,7 +15,6 @@ use crate::error::{Error, Result};
 type Instant = DateTime<Utc>;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-#[enum_dispatch(Effect)]
 pub enum EffectType {
     Empty(Empty),
     Ball(Ball),
@@ -22,7 +22,7 @@ pub enum EffectType {
     Glow(Glow),
     Rainbow(Rainbow),
     Composite(Composite),
-    RuneScript(RuneScript),
+    RuneScript(SourceCode),
 }
 
 impl EffectType {
@@ -59,7 +59,14 @@ impl EffectType {
             EffectType::Balls(bs) => Box::new(bs),
             EffectType::Glow(g) => Box::new(g),
             EffectType::Rainbow(r) => Box::new(r),
-            EffectType::RuneScript(s) => Box::new(s),
+            EffectType::RuneScript(s) => {
+                let source = RuneScript::from_source(s);
+                if source.is_err() {
+                    log::error!("Error compiling: {:?}", source);
+                    panic!("Error");
+                }
+                Box::new(source.unwrap())
+            }
         }
     }
 
@@ -71,7 +78,7 @@ impl EffectType {
             EffectType::Balls(bs) => bs,
             EffectType::Glow(g) => g,
             EffectType::Rainbow(r) => r,
-            EffectType::RuneScript(s) => s,
+            EffectType::RuneScript(s) => todo!(),
         }
     }
 
@@ -83,7 +90,7 @@ impl EffectType {
             EffectType::Balls(bs) => bs,
             EffectType::Glow(g) => g,
             EffectType::Rainbow(r) => r,
-            EffectType::RuneScript(s) => s,
+            EffectType::RuneScript(s) => todo!(),
         }
     }
 
@@ -97,18 +104,6 @@ impl EffectType {
             "Composite" => Self::Composite(Default::default()),
             "Rune Script" => Self::RuneScript(Default::default()),
             _ => Default::default(),
-        }
-    }
-
-    pub fn render(&mut self, pixels: &mut [LinSrgb<u8>], t: Instant) -> Result<Duration> {
-        match self {
-            EffectType::Empty(Empty) => Empty.render(pixels, t),
-            EffectType::Ball(b) => b.render(pixels, t),
-            EffectType::Balls(bs) => bs.render(pixels, t),
-            EffectType::Glow(g) => g.render(pixels, t),
-            EffectType::Composite(c) => c.render(pixels, t),
-            EffectType::Rainbow(r) => r.render(pixels, t),
-            EffectType::RuneScript(s) => s.render(pixels, t),
         }
     }
 }
@@ -130,22 +125,67 @@ impl FromStr for EffectType {
             "Balls" => Ok(Self::Balls(Default::default())),
             "Glow" => Ok(Self::Glow(Default::default())),
             "Rainbow" => Ok(Self::Rainbow(Default::default())),
+            "Rune Script" => Ok(Self::RuneScript(Default::default())),
             _ => Err(Error::BadEffectType),
         }
     }
 }
 
+impl From<Empty> for EffectType {
+    fn from(orig: Empty) -> Self {
+        Self::Empty(orig)
+    }
+}
+
+impl From<Ball> for EffectType {
+    fn from(orig: Ball) -> Self {
+        Self::Ball(orig)
+    }
+}
+
+impl From<Balls> for EffectType {
+    fn from(orig: Balls) -> Self {
+        Self::Balls(orig)
+    }
+}
+
+impl From<Glow> for EffectType {
+    fn from(orig: Glow) -> Self {
+        Self::Glow(orig)
+    }
+}
+
+impl From<Composite> for EffectType {
+    fn from(orig: Composite) -> Self {
+        Self::Composite(orig)
+    }
+}
+
+impl From<Rainbow> for EffectType {
+    fn from(orig: Rainbow) -> Self {
+        Self::Rainbow(orig)
+    }
+}
+
+impl From<RuneScript> for EffectType {
+    fn from(orig: RuneScript) -> Self {
+        Self::RuneScript(orig.sourcecode)
+    }
+}
+
 #[enum_dispatch]
 pub trait Effect:
-    Debug + mopa::Any + serde_traitobject::Serialize + serde_traitobject::Deserialize
+    Debug + mopa::Any + serde_traitobject::Serialize + serde_traitobject::Deserialize + DynClone
 {
     fn render(&mut self, pixels: &mut [LinSrgb<u8>], t: Instant) -> Result<Duration>;
-    fn is_ready(&self, t: Instant) -> bool;
+    fn is_ready(&self, t: Instant) -> Result<bool>;
 
     fn to_cloned_type(&self) -> EffectType;
 }
 
 mopafy!(Effect);
+
+dyn_clone::clone_trait_object!(Effect);
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 pub struct Empty;
@@ -155,8 +195,8 @@ impl Effect for Empty {
         Ok(Duration::milliseconds(100))
     }
 
-    fn is_ready(&self, _t: Instant) -> bool {
-        true
+    fn is_ready(&self, _t: Instant) -> Result<bool> {
+        Ok(true)
     }
 
     fn to_cloned_type(&self) -> EffectType {
@@ -175,23 +215,36 @@ impl Default for Composite {
 
 impl Composite {
     pub fn new(first: EffectType, second: EffectType) -> Result<Self> {
-        Ok(Self(Box::new(first), Box::new(second)))
+        if matches!(first, EffectType::RuneScript(_)) || matches!(second, EffectType::RuneScript(_))
+        {
+            Err(Error::CompositeScriptError)
+        } else {
+            Ok(Self(Box::new(first), Box::new(second)))
+        }
     }
 
     pub fn first(&self) -> &EffectType {
-        &self.0
+        self.0.as_ref()
     }
 
-    pub fn set_first(&mut self, e: EffectType) {
+    pub fn set_first(&mut self, e: EffectType) -> Result<()> {
+        if matches!(e, EffectType::RuneScript(_)) {
+            return Err(Error::CompositeScriptError);
+        }
         self.0 = Box::new(e);
+        Ok(())
     }
 
     pub fn second(&self) -> &EffectType {
-        &self.1
+        self.1.as_ref()
     }
 
-    pub fn set_second(&mut self, e: EffectType) {
+    pub fn set_second(&mut self, e: EffectType) -> Result<()> {
+        if matches!(e, EffectType::RuneScript(_)) {
+            return Err(Error::CompositeScriptError);
+        }
         self.1 = Box::new(e);
+        Ok(())
     }
 }
 
@@ -201,10 +254,10 @@ impl Effect for Composite {
         Ok(std::cmp::min(d, self.1.inner_mut_ref().render(pixels, t)?))
     }
 
-    fn is_ready(&self, t: Instant) -> bool {
+    fn is_ready(&self, t: Instant) -> Result<bool> {
         [self.0.inner_ref(), self.1.inner_ref()]
             .iter()
-            .any(|e| e.is_ready(t))
+            .try_fold(false, |accum, e| Ok(accum || e.is_ready(t)?))
     }
 
     fn to_cloned_type(&self) -> EffectType {
@@ -322,7 +375,7 @@ impl Effect for Ball {
         if self.count != pixels.len() {
             self.count = pixels.len();
         }
-        if self.is_ready(t) {
+        if self.is_ready(t)? {
             self.update_state();
             let pixel = (self.position as isize + self.direction as isize) as usize % pixels.len();
             self.position = pixel;
@@ -341,8 +394,8 @@ impl Effect for Ball {
         }
     }
 
-    fn is_ready(&self, t: Instant) -> bool {
-        self.next_update.is_none() || t >= self.next_update.unwrap()
+    fn is_ready(&self, t: Instant) -> Result<bool> {
+        Ok(self.next_update.is_none() || t >= self.next_update.unwrap())
     }
 
     fn to_cloned_type(&self) -> EffectType {
@@ -389,8 +442,10 @@ impl Effect for Balls {
         Ok(min)
     }
 
-    fn is_ready(&self, t: Instant) -> bool {
-        self.0.iter().any(|b| b.is_ready(t))
+    fn is_ready(&self, t: Instant) -> Result<bool> {
+        self.0
+            .iter()
+            .try_fold(false, |accum, b| Ok(accum || b.is_ready(t)?))
     }
 
     fn to_cloned_type(&self) -> EffectType {
@@ -456,7 +511,7 @@ impl Default for Glow {
 
 impl Effect for Glow {
     fn render(&mut self, pixels: &mut [LinSrgb<u8>], t: Instant) -> Result<Duration> {
-        let color: LinSrgb<u8> = if self.is_ready(t) {
+        let color: LinSrgb<u8> = if self.is_ready(t)? {
             let gradient = Gradient::new(vec![
                 Hsv::from_color(self.colors[self.color_idx].into_format()),
                 Hsv::from_color(
@@ -488,8 +543,8 @@ impl Effect for Glow {
         }
     }
 
-    fn is_ready(&self, t: Instant) -> bool {
-        self.next_update.map(|u| t >= u).unwrap_or(true)
+    fn is_ready(&self, t: Instant) -> Result<bool> {
+        Ok(self.next_update.map(|u| t >= u).unwrap_or(true))
     }
 
     fn to_cloned_type(&self) -> EffectType {
@@ -501,10 +556,13 @@ impl Effect for Glow {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Rainbow {
     colors: Vec<LinSrgb<u8>>,
-    pub strip_width: usize,
+    color_width: usize,
+    spacing: usize,
     pub direction: i8,
 
     step: usize,
+
+    color_strip: Vec<LinSrgb<u8>>,
 
     #[serde_as(as = "DurationMilliSeconds<i64>")]
     pub delay: Duration,
@@ -515,18 +573,38 @@ pub struct Rainbow {
 impl Rainbow {
     pub fn new(
         colors: Vec<LinSrgb<u8>>,
-        strip_width: usize,
+        color_width: usize,
+        spacing: usize,
         direction: i8,
         delay: Duration,
     ) -> Self {
-        Self {
+        let mut this = Self {
             colors,
-            strip_width,
+            color_width,
+            spacing,
             direction,
             step: 0,
+            color_strip: vec![],
             delay,
             next_update: None,
-        }
+        };
+        this.generate_color_strip();
+        this
+    }
+
+    fn generate_color_strip(&mut self) {
+        self.color_strip = self
+            .colors
+            .iter()
+            .cloned()
+            .map(|c| {
+                iter::repeat(c)
+                    .take(self.color_width)
+                    .chain(iter::repeat(LinSrgb::new(0u8, 0, 0)).take(self.spacing))
+            })
+            .flatten()
+            .collect::<Vec<_>>();
+        log::info!("strip length: {}", self.color_strip.len());
     }
 
     pub fn colors(&self) -> &[LinSrgb<u8>] {
@@ -535,34 +613,52 @@ impl Rainbow {
 
     pub fn set_color(&mut self, idx: usize, color: LinSrgb<u8>) {
         self.colors[idx] = color;
+        self.generate_color_strip();
     }
 
     pub fn add_color(&mut self, color: LinSrgb<u8>) {
         self.colors.push(color);
+        self.generate_color_strip();
     }
 
     pub fn remove_color(&mut self, idx: usize) {
         self.colors.remove(idx);
+        self.generate_color_strip();
+    }
+
+    pub fn set_spacing(&mut self, spacing: usize) {
+        self.spacing = spacing;
+        self.generate_color_strip();
+    }
+
+    pub fn spacing(&self) -> usize {
+        self.spacing
+    }
+
+    pub fn set_color_width(&mut self, width: usize) {
+        self.color_width = width;
+        self.generate_color_strip();
+    }
+
+    pub fn color_width(&self) -> usize {
+        self.color_width
     }
 }
 
 impl Effect for Rainbow {
     fn render(&mut self, pixels: &mut [LinSrgb<u8>], t: Instant) -> Result<Duration> {
-        let tmp: Vec<LinSrgb<u8>> = self
-            .colors
+        let len = pixels.len();
+        let tmp = &self.color_strip[..]
             .iter()
             .cloned()
-            .map(|c| iter::repeat(c).take(self.strip_width))
-            .flatten()
             .cycle()
-            .take(pixels.len())
+            .take(len)
             .collect::<Vec<_>>();
-
-        let len = pixels.len();
         pixels[self.step..].copy_from_slice(&tmp[..len - self.step]);
         pixels[..self.step].copy_from_slice(&tmp[len - self.step..]);
+        // pixels[self.step] = LinSrgb::new(255, 255, 255);
 
-        if self.is_ready(t) {
+        if self.is_ready(t)? {
             self.step =
                 (self.step as isize + (1 * self.direction as isize)) as usize % pixels.len();
             self.next_update = Some(t + self.delay);
@@ -576,8 +672,8 @@ impl Effect for Rainbow {
         }
     }
 
-    fn is_ready(&self, t: Instant) -> bool {
-        self.next_update.map(|u| t >= u).unwrap_or(true)
+    fn is_ready(&self, t: Instant) -> Result<bool> {
+        Ok(self.next_update.map(|u| t >= u).unwrap_or(true))
     }
 
     fn to_cloned_type(&self) -> EffectType {
@@ -597,7 +693,8 @@ impl Default for Rainbow {
                 LinSrgb::new(0x4B, 0x00, 0x82),
                 LinSrgb::new(0x94, 0x00, 0xD3),
             ],
-            5,
+            1,
+            3,
             1,
             Duration::milliseconds(100),
         )

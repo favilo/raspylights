@@ -21,6 +21,7 @@ pub(crate) enum Msg {
     AddColor,
     ReplaceColor(usize, LinSrgb<u8>),
     RemoveColor(usize),
+    Spacing(usize),
     Delay(i64),
     Direction,
 }
@@ -49,6 +50,7 @@ impl Component for Rainbow {
             Msg::RemoveColor(idx) => self.props.rainbow.remove_color(idx),
             Msg::Delay(delay) => self.props.rainbow.delay = Duration::milliseconds(delay),
             Msg::Direction => self.props.rainbow.direction *= -1,
+            Msg::Spacing(s) => self.props.rainbow.set_spacing(s),
         };
         self.props
             .onupdate
@@ -137,6 +139,31 @@ impl Component for Rainbow {
                             }
                             value={ direction }
                         />
+                    </ybc::Control>
+                </ybc::Field>
+                <ybc::Field addons={ true }>
+                    <label class="label">{ "Spacing between colors" }</label>
+                    <ybc::Control classes={ classes!("has-addons") }>
+                        <input type="number" name="spacing" id="spacing_real" class="input"
+                            onchange={
+                                self.link.callback(move |ty| {
+                                    let spacing = match ty {
+                                        ChangeData::Value(s) => {
+                                            s.parse().unwrap_or(3)
+                                        }
+                                        _ => 3,
+                                    };
+                                    Msg::Spacing(spacing)
+                                })
+                            }
+                            oninput={
+                                self.link.callback(move |ty:InputData| {
+                                    let spacing = ty.value.parse().unwrap_or(100);
+                                    Msg::Spacing(spacing)
+                                })
+                            }
+                            value= { self.props.rainbow.spacing().to_string() }
+                            />
                     </ybc::Control>
                 </ybc::Field>
                 <ybc::Field addons={ true }>
