@@ -1,6 +1,6 @@
 use crate::components;
 
-use lights::effects::{Ball, Balls, Composite, Glow, Rainbow};
+use lights::effects::{Ball, Balls, Composite, Glow, Rainbow, SourceCode};
 use yew::{html::IntoPropValue, prelude::*};
 
 pub fn view_empty() -> Html {
@@ -91,5 +91,27 @@ where
             rainbow = { rainbow.clone() }
             onupdate = { Some(link.callback(lambda)) }
          />
+    }
+}
+
+pub fn view_runescript<COMP, F, IN, M>(
+    runescript: &SourceCode,
+    link: &ComponentLink<COMP>,
+    lambda: F,
+) -> Html
+where
+    COMP: Component,
+    F: Fn(IN) -> M + 'static,
+    M: Into<COMP::Message>,
+    Option<Callback<IN>>: IntoPropValue<Option<Callback<SourceCode>>>,
+{
+    html! {
+        <>
+            {"Work in Progress"}
+        </>
+        // <components::Runescript
+        //     runescript = { runescript.clone() }
+        //     onupdate = { Some(link.callback(lambda)) }
+        //  />
     }
 }

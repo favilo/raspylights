@@ -13,7 +13,7 @@ impl Default for Details {
     fn default() -> Self {
         Self {
             length: 100,
-            brightness: 255,
+            brightness: 150,
             effect: Default::default(),
         }
     }

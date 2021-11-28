@@ -23,6 +23,9 @@ pub(crate) struct Props {
 
     #[prop_or_default]
     pub onclick: Option<Callback<&'static str>>,
+
+    #[prop_or_default]
+    pub internal: bool,
 }
 
 impl Component for Selector {
@@ -52,6 +55,7 @@ impl Component for Selector {
         let options: Vec<_> = effects
             .iter()
             .cloned()
+            .filter(|ty| !(self.props.internal && ty == &"Rune Script"))
             .map(|i| {
                 let id = format!("{}", i);
                 let classes = if i == self.props.ty {
