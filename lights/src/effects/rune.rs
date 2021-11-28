@@ -219,10 +219,7 @@ impl Default for SourceCode {
     fn default() -> Self {
         Self::Source(
             r#"
-            struct Ball {
-                pos,
-                next,
-            };
+            struct Nothing;
 
             pub fn render(state, pixels, t) {
                 println(`Running ${pixels.len()}`);
@@ -235,7 +232,7 @@ impl Default for SourceCode {
             }
 
             pub fn init() {
-                Ball {}
+                Nothing
             }
             "#
             .to_owned(),

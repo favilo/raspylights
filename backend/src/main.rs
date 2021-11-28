@@ -23,6 +23,7 @@ use chrono::Utc;
 #[cfg(target_arch = "arm")]
 use daemonize::Daemonize;
 use lights::{details::Details, effects::RuneScript, error::Error};
+use serde_json::Value;
 use signal_hook::consts;
 use tide::{http::mime, log, prelude::*, Request, Response};
 
@@ -31,6 +32,7 @@ use crate::{storage::Storage, strip::LedStrip};
 async fn render_main(
     receiver: Receiver<Details>,
     details: Arc<RwLock<Details>>,
+    power: Arc<AtomicBool>,
     term: Arc<AtomicBool>,
     storage: Storage,
 ) -> Result<()> {
@@ -48,6 +50,14 @@ async fn render_main(
         if term.load(Ordering::Relaxed) {
             break;
         }
+
+        if !power.load(Ordering::Relaxed) {
+            // Power is off, lets render black every 100 ms
+            task::sleep(std::time::Duration::from_millis(100)).await;
+            strip.render()?;
+            continue;
+        }
+
         if let Ok(deets) = receiver.try_recv() {
             log::info!("We got some deets: {:#?}", deets);
             strip.set_effect(deets.effect.clone())?;
@@ -84,6 +94,7 @@ async fn render_main(
 struct State {
     details: Arc<RwLock<Details>>,
     sender: Sender<Details>,
+    power: Arc<AtomicBool>,
 }
 
 async fn get_details(req: Request<State>) -> tide::Result {
@@ -105,10 +116,30 @@ async fn post_details(mut req: Request<State>) -> tide::Result {
     Ok(resp.into())
 }
 
+async fn get_power(req: Request<State>) -> tide::Result {
+    let resp = Response::builder(200)
+        .body(json!({"active": req.state().power.load(Ordering::Relaxed)}))
+        .content_type(mime::JSON)
+        .build();
+    Ok(resp.into())
+}
+
+async fn post_power(mut req: Request<State>) -> tide::Result {
+    let json: Value = req.body_json().await?;
+    let power: bool = json.get("active").and_then(Value::as_bool).unwrap_or(false);
+    req.state().power.store(power, Ordering::Relaxed);
+    let resp = Response::builder(200)
+        .body(json!({ "active": power }))
+        .content_type(mime::JSON)
+        .build();
+    Ok(resp.into())
+}
+
 async fn web_main(
     sender: Sender<Details>,
     details: Arc<RwLock<Details>>,
     term: Arc<AtomicBool>,
+    power: Arc<AtomicBool>,
 ) -> Result<()> {
     let die = async {
         loop {
@@ -120,10 +151,16 @@ async fn web_main(
         Ok(())
     };
 
-    let mut app = tide::Server::with_state(State { details, sender });
+    let mut app = tide::Server::with_state(State {
+        details,
+        sender,
+        power,
+    });
     app.at("/").serve_file("./frontend/index.html")?;
     app.at("/details").get(get_details);
     app.at("/details").post(post_details);
+    app.at("/power").get(get_power);
+    app.at("/power").post(post_power);
     app.at("/pkg").serve_dir("./frontend/pkg/")?;
     app.at("/mdc").serve_dir("./frontend/static/mdc/")?;
     app.at("/style.css")
@@ -169,17 +206,20 @@ fn main() -> Result<()> {
         .unwrap_or_default();
     log::info!("Details loaded: {:#?}", details);
     let details = Arc::new(RwLock::new(details));
+    let power = Arc::new(AtomicBool::new(true));
+    let power2 = Arc::clone(&power);
     let details2 = Arc::clone(&details);
     let term2 = Arc::clone(&term);
     let render = thread::spawn(move || {
         task::block_on(async {
-            render_main(receiver, details, term2, storage)
+            render_main(receiver, details, power2, term2, storage)
                 .await
                 .unwrap();
         });
     });
     let task = thread::spawn(move || {
-        task::block_on(async { web_main(sender, details2, term).await }).expect("block should work")
+        task::block_on(async { web_main(sender, details2, term, power).await })
+            .expect("block should work")
     });
     render.join().expect("Rendering stopped");
     task.join().expect("task completed");
