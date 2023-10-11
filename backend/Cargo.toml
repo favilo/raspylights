@@ -6,25 +6,25 @@ edition = "2021"
 
 [dependencies]
 # anyhow = { version  = "1.0.42", features = ["backtrace"] }
-anyhow = { version  = "1.0.42", features = [] }
-async-std = "1.10.0"
-chrono = "0.4.19"
-heed = { version = "0.11.0", features = ["mdbx", "serde-json"], default_features = false }
-# heed = { version = "0.11.0", features = ["lmdb", "serde-json"], default_features = false }
-itertools = "0.10.1"
+anyhow = { version  = "1.0.75", features = [] }
+async-std = "1.12.0"
+chrono = "0.4.31"
+heed = { version = "0.11.0", features = ["mdbx", "serde-json"], default-features = false }
+itertools = { workspace = true }
 lights = { path = "../lights" }
-log = "0.4.14"
-palette = "0.6.0"
-rmp = "0.8.10"
-rmp-serde = "0.15.5"
-serde = { version = "1.0.126", features = ["derive"] }
-serde_json = "1.0.72"
-signal-hook = "0.3.9"
+log = { workspace = true }
+palette = { workspace = true }
+rmp = "0.8.12"
+rmp-serde = "1.1.2"
+serde = { workspace = true }
+serde_json = "1.0.107"
+signal-hook = "0.3.17"
 
 [dependencies.tide]
-git = "https://github.com/http-rs/tide"
-branch = "main"
+# git = "https://github.com/http-rs/tide"
+version = "0.16"
+# branch = "main"
 
 [target.'cfg(target_arch = "arm")'.dependencies]
-daemonize = "0.4.1"
-rs_ws281x = "0.4.2"
+daemonize = "0.5.0"
+rs_ws281x = "0.4.4"

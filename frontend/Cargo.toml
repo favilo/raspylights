@@ -13,29 +13,30 @@ crate-type = ["cdylib"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dev-dependencies]
-wasm-bindgen-test = "0.3.24"
+wasm-bindgen-test = "0.3.37"
 
 [dependencies]
-anyhow = "1.0.42"
-chrono = { version = "0.4.19", features = ["serde"] }
-console_error_panic_hook = "0.1.6"
-gloo = "*"
+anyhow = "1.0.75"
+chrono = { version = "0.4.31", features = ["serde"] }
+console_error_panic_hook = "0.1.7"
+gloo = "0.10.0"
+gloo-storage = "0.3.0"
 hex = "0.4.3"
 instant = {  version = "0.1.12", features = ["web-sys", "wasm-bindgen", "inaccurate"] }
 lights = { path = "../lights" }
-log = "0.4.14"
-palette = { version = "0.6.0", features = ["serializing"] }
-serde = { version = "1.0.126", features = ["derive"] }
-serde_json = "1.0.64"
-serde_traitobject = "0.2.7"
-wasm-bindgen = "0.2.74"
-wasm-bindgen-futures = "0.4.28"
+log = { workspace = true }
+palette = { workspace = true }
+serde = { workspace = true }
+serde_json = "1.0.107"
+serde_traitobject = { workspace = true }
+wasm-bindgen = "0.2.87"
+wasm-bindgen-futures = "0.4.37"
 wasm-logger = "0.2.0"
-web-sys = { version = "0.3.55", features = ["CanvasRenderingContext2d", "HtmlCanvasElement"] }
+web-sys = { version = "0.3.64", features = ["CanvasRenderingContext2d", "HtmlCanvasElement"] }
 wee_alloc = { version = "0.4.5", optional = true }
-ybc = "0.2.1"
-yew = "0.18.0"
-yew-mdc-widgets = { git = "https://github.com/noogen-projects/yew-mdc-widgets.git", branch = "master" }
+ybc = "0.4.0"
+yew = "0.20.0" # TODO: upgrade this after ybc upgrades
+yew-mdc-widgets = { git = "https://github.com/noogen-projects/yew-mdc-widgets.git", revision = "4370fd46fb04fac89bc91b6f12f72dd6e8d1486b" }
 yewtil = "0.4.0"
 
 [package.metadata.wasm-pack.profile.release]

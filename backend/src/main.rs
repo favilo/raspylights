@@ -25,7 +25,7 @@ use daemonize::Daemonize;
 use lights::{details::Details, effects::RuneScript, error::Error};
 use serde_json::Value;
 use signal_hook::consts;
-use tide::{http::mime, log, prelude::*, Request, Response};
+use tide::{http::mime, prelude::*, Request, Response};
 
 use crate::{storage::Storage, strip::LedStrip};
 

@@ -1,7 +1,10 @@
 use crate::components;
 
 use lights::effects::{Ball, Balls, Composite, Glow, Rainbow, SourceCode};
-use yew::{html::IntoPropValue, prelude::*};
+use yew::{
+    html::{IntoPropValue, Scope},
+    prelude::*,
+};
 
 pub fn view_empty() -> Html {
     html! {
@@ -11,7 +14,7 @@ pub fn view_empty() -> Html {
     }
 }
 
-pub fn view_ball<COMP, F, IN, M>(ball: &Ball, link: &ComponentLink<COMP>, lambda: F) -> Html
+pub fn view_ball<COMP, F, IN, M>(ball: &Ball, link: &Scope<COMP>, lambda: F) -> Html
 where
     COMP: Component,
     F: Fn(IN) -> M + 'static,
@@ -26,7 +29,7 @@ where
     }
 }
 
-pub fn view_balls<COMP, F, IN, M>(balls: &Balls, link: &ComponentLink<COMP>, lambda: F) -> Html
+pub fn view_balls<COMP, F, IN, M>(balls: &Balls, link: &Scope<COMP>, lambda: F) -> Html
 where
     COMP: Component,
     F: Fn(IN) -> M + 'static,
@@ -41,7 +44,7 @@ where
     }
 }
 
-pub fn view_glow<COMP, F, IN, M>(glow: &Glow, link: &ComponentLink<COMP>, lambda: F) -> Html
+pub fn view_glow<COMP, F, IN, M>(glow: &Glow, link: &Scope<COMP>, lambda: F) -> Html
 where
     COMP: Component,
     F: Fn(IN) -> M + 'static,
@@ -56,11 +59,7 @@ where
     }
 }
 
-pub fn view_composite<COMP, F, IN, M>(
-    composite: &Composite,
-    link: &ComponentLink<COMP>,
-    lambda: F,
-) -> Html
+pub fn view_composite<COMP, F, IN, M>(composite: &Composite, link: &Scope<COMP>, lambda: F) -> Html
 where
     COMP: Component,
     F: Fn(IN) -> M + 'static,
@@ -75,11 +74,7 @@ where
     }
 }
 
-pub fn view_rainbow<COMP, F, IN, M>(
-    rainbow: &Rainbow,
-    link: &ComponentLink<COMP>,
-    lambda: F,
-) -> Html
+pub fn view_rainbow<COMP, F, IN, M>(rainbow: &Rainbow, link: &Scope<COMP>, lambda: F) -> Html
 where
     COMP: Component,
     F: Fn(IN) -> M + 'static,
@@ -96,7 +91,7 @@ where
 
 pub fn view_runescript<COMP, F, IN, M>(
     runescript: &SourceCode,
-    link: &ComponentLink<COMP>,
+    link: &Scope<COMP>,
     lambda: F,
 ) -> Html
 where

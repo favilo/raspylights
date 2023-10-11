@@ -8,14 +8,12 @@ use crate::utils::{view_ball, view_balls, view_composite, view_empty, view_glow,
 
 #[derive(Clone, Debug)]
 pub(crate) struct Composite {
-    link: ComponentLink<Self>,
-
-    props: Props,
+    effect: lights::effects::Composite,
 }
 
 impl Composite {
     fn to_effect(&self) -> lights::effects::Composite {
-        self.props.composite.clone()
+        self.effect.clone()
     }
 }
 
@@ -38,32 +36,30 @@ impl Component for Composite {
 
     type Properties = Props;
 
-    fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
-        Self { link, props }
+    fn create(ctx: &Context<Self>) -> Self {
+        Self {
+            effect: ctx.props().composite.clone(),
+        }
     }
 
-    fn update(&mut self, msg: Self::Message) -> ShouldRender {
+    fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
         let result = match msg {
-            Msg::SetFirst(effect) => self.props.composite.set_first(effect),
-            Msg::SetSecond(effect) => self.props.composite.set_second(effect),
+            Msg::SetFirst(effect) => self.effect.set_first(effect),
+            Msg::SetSecond(effect) => self.effect.set_second(effect),
         };
         if result.is_err() {
             log::error!("Tried to set the wrong type");
             return true;
         }
 
-        self.props
+        ctx.props()
             .onupdate
             .as_ref()
             .map(|u| u.emit(self.to_effect()));
         true
     }
 
-    fn change(&mut self, props: Self::Properties) -> ShouldRender {
-        self.props.neq_assign(props)
-    }
-
-    fn view(&self) -> Html {
+    fn view(&self, ctx: &Context<Self>) -> Html {
         html! {
             <>
                 <div class="foreground box">
@@ -71,28 +67,28 @@ impl Component for Composite {
                     <div class="effect_select">
                         <super::Selector
                             id = { "second" }
-                            ty = { self.props.composite.second().name() }
-                            onclick = { Some(self.link.callback(|ty| {
+                            ty = { ctx.props().composite.second().name() }
+                            onclick = { Some(ctx.link().callback(|ty| {
                                 Msg::SetSecond(EffectType::from_str(ty).expect("Don't pass wrong type"))
                             })) }
                             internal = true
                         />
                     </div>
-                    { self.view_effect(self.props.composite.second(), false) }
+                    { self.view_effect(ctx, ctx.props().composite.second(), false) }
                 </div>
                 <div class="background box">
                     <h2>{ "Background" }</h2>
                     <div class="effect_select">
                         <super::Selector
                             id = { "first" }
-                            ty = { self.props.composite.first().name() }
-                            onclick = { Some(self.link.callback(|ty| {
+                            ty = { ctx.props().composite.first().name() }
+                            onclick = { Some(ctx.link().callback(|ty| {
                                 Msg::SetFirst(EffectType::from_str(ty).expect("Don't pass wrong type"))
                             })) }
                             internal = true
                         />
                     </div>
-                    { self.view_effect(self.props.composite.first(), true) }
+                    { self.view_effect(ctx, ctx.props().composite.first(), true) }
                 </div>
             </>
         }
@@ -100,56 +96,60 @@ impl Component for Composite {
 }
 
 impl Composite {
-    fn view_effect(&self, t: &EffectType, first: bool) -> Html {
+    fn view_effect(&self, ctx: &Context<Self>, t: &EffectType, first: bool) -> Html {
         match (t, first) {
             (EffectType::Empty(_), _) => view_empty(),
             (EffectType::Ball(b), first) => {
                 if first {
-                    view_ball(&b, &self.link, |ball| Msg::SetFirst(EffectType::Ball(ball)))
+                    view_ball(&b, &ctx.link(), |ball| {
+                        Msg::SetFirst(EffectType::Ball(ball))
+                    })
                 } else {
-                    view_ball(&b, &self.link, |ball| {
+                    view_ball(&b, &ctx.link(), |ball| {
                         Msg::SetSecond(EffectType::Ball(ball))
                     })
                 }
             }
             (EffectType::Balls(bs), first) => {
                 if first {
-                    view_balls(&bs, &self.link, |balls| {
+                    view_balls(&bs, &ctx.link(), |balls| {
                         Msg::SetFirst(EffectType::Balls(balls))
                     })
                 } else {
-                    view_balls(&bs, &self.link, |balls| {
+                    view_balls(&bs, &ctx.link(), |balls| {
                         Msg::SetSecond(EffectType::Balls(balls))
                     })
                 }
             }
             (EffectType::Glow(g), first) => {
                 if first {
-                    view_glow(&g, &self.link, |glow| Msg::SetFirst(EffectType::Glow(glow)))
+                    view_glow(&g, &ctx.link(), |glow| {
+                        Msg::SetFirst(EffectType::Glow(glow))
+                    })
                 } else {
-                    view_glow(&g, &self.link, |glow| {
+                    view_glow(&g, &ctx.link(), |glow| {
                         Msg::SetSecond(EffectType::Glow(glow))
                     })
                 }
             }
             (EffectType::Composite(c), first) => {
                 if first {
-                    view_composite(&c, &self.link, |composite| {
+                    view_composite(&c, &ctx.link(), |composite| {
                         Msg::SetFirst(EffectType::Composite(composite))
                     })
                 } else {
-                    view_composite(&c, &self.link, |composite| {
+                    view_composite(&c, &ctx.link(), |composite| {
                         Msg::SetSecond(EffectType::Composite(composite))
                     })
                 }
             }
             (EffectType::Rainbow(r), first) => {
                 if first {
-                    view_rainbow(&r, &self.link, |rainbow| {
+                    view_rainbow(&r, &ctx.link(), |rainbow| {
                         Msg::SetFirst(EffectType::Rainbow(rainbow))
                     })
                 } else {
-                    view_rainbow(&r, &self.link, |rainbow| {
+                    view_rainbow(&r, &ctx.link(), |rainbow| {
                         Msg::SetSecond(EffectType::Rainbow(rainbow))
                     })
                 }

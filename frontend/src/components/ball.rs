@@ -7,14 +7,12 @@ use yewtil::NeqAssign;
 
 #[derive(Clone, Debug)]
 pub(crate) struct Ball {
-    link: ComponentLink<Self>,
-
-    props: Props,
+    effect: lights::effects::Ball,
 }
 
 impl Ball {
     fn to_effect(&self) -> lights::effects::Ball {
-        self.props.ball.clone()
+        self.effect.clone()
     }
 }
 
@@ -40,52 +38,50 @@ impl Component for Ball {
 
     type Properties = Props;
 
-    fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
-        Self { link, props }
+    fn create(ctx: &Context<Self>) -> Self {
+        Self {
+            effect: ctx.props().ball.clone(),
+        }
     }
 
-    fn update(&mut self, msg: Self::Message) -> ShouldRender {
+    fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
         match msg {
             Msg::Color(color) => {
-                self.props.ball.color = color;
+                self.effect.color = color;
             }
             Msg::Pos(pos) => {
-                self.props.ball.position = pos;
+                self.effect.position = pos;
             }
             // Msg::Count(count) => {
-            //     self.props.ball.count = count;
+            //     self.effect.count = count;
             // }
             Msg::Direction(direction) => {
-                self.props.ball.direction = direction;
+                self.effect.direction = direction;
             }
             Msg::Bounce(bounce) => {
-                self.props.ball.bounce = bounce;
+                self.effect.bounce = bounce;
             }
             Msg::Delay(delay) => {
-                self.props.ball.delay = Duration::milliseconds(delay);
+                self.effect.delay = Duration::milliseconds(delay);
             }
         }
-        self.props
+        ctx.props()
             .onupdate
             .as_ref()
             .map(|u| u.emit(self.to_effect()));
         true
     }
 
-    fn change(&mut self, props: Self::Properties) -> ShouldRender {
-        self.props.neq_assign(props)
-    }
-
-    fn view(&self) -> Html {
-        let is_bounce = self.props.ball.is_bounce();
-        let ball_direction = self.props.ball.direction;
+    fn view(&self, ctx: &Context<Self>) -> Html {
+        let is_bounce = ctx.props().ball.is_bounce();
+        let ball_direction = ctx.props().ball.direction;
         let behaviour = if is_bounce { "Bouncing" } else { "Wrapping" };
         let direction = if ball_direction == 1 {
             "Forward"
         } else {
             "Backward"
         };
-        let color = self.props.ball.color();
+        let color = ctx.props().ball.color();
         html! {
             <>
                 <ybc::Field>
@@ -94,25 +90,25 @@ impl Component for Ball {
                         id={ "ball_color" }
                         name={ "ball_color" }
                         value={ format!("#{:02x}{:02x}{:02x}", color.red, color.green, color.blue) }
-                        onchange={ self.link.callback(move |c: ChangeData| {
-                            match &c {
-                                ChangeData::Value(v) => {
-                                    let mut buf = [0_u8; 3];
-                                    let s = v.trim_start_matches('#');
-                                    let v = hex::decode_to_slice(s, &mut buf);
-                                    if v.is_err() {
-                                        return Msg::Color(color);
-                                    }
+                        // onchange={ ctx.link().callback(move |c: ChangeData| {
+                        //     match &c {
+                        //         ChangeData::Value(v) => {
+                        //             let mut buf = [0_u8; 3];
+                        //             let s = v.trim_start_matches('#');
+                        //             let v = hex::decode_to_slice(s, &mut buf);
+                        //             if v.is_err() {
+                        //                 return Msg::Color(color);
+                        //             }
 
-                                    Msg::Color(LinSrgb::new(buf[0], buf[1], buf[2]))
+                        //             Msg::Color(LinSrgb::new(buf[0], buf[1], buf[2]))
 
-                                }
-                                _ => {
-                                    log::error!("Wong changedata type");
-                                    unreachable!("wrong changedata type?")
-                                },
-                            }
-                        }) }
+                        //         }
+                        //         _ => {
+                        //             log::error!("Wong changedata type");
+                        //             unreachable!("wrong changedata type?")
+                        //         },
+                        //     }
+                        // }) }
                     />
                 </ybc::Field>
                 <ybc::Field>
@@ -123,21 +119,21 @@ impl Component for Ball {
                         value="0"
                         id="starting_point"
                         name="starting_point"
-                        onchange={
-                            self.link.callback(move |c| {
-                                match c {
-                                    ChangeData::Value(v) => {
-                                        let pos = v.parse().unwrap_or(100);
-                                        Msg::Pos(pos)
-                                    }
-                                    _ => {
-                                        log::error!("Wong changedata type");
-                                        unreachable!("wrong changedata type?")
-                                    }
-                                }
+                        // onchange={
+                        //     ctx.link().callback(move |c| {
+                        //         match c {
+                        //             ChangeData::Value(v) => {
+                        //                 let pos = v.parse().unwrap_or(100);
+                        //                 Msg::Pos(pos)
+                        //             }
+                        //             _ => {
+                        //                 log::error!("Wong changedata type");
+                        //                 unreachable!("wrong changedata type?")
+                        //             }
+                        //         }
 
-                            })
-                        }
+                        //     })
+                        // }
                     />
                 </ybc::Field>
                 <ybc::Field addons={ true }>
@@ -147,7 +143,7 @@ impl Component for Ball {
                             id="behavior"
                             name="behavior"
                             onclick={
-                                self.link.callback(move |_| {
+                                ctx.link().callback(move |_| {
                                     Msg::Bounce(!is_bounce)
                                 })
                             }
@@ -162,7 +158,7 @@ impl Component for Ball {
                             id="direction"
                             name="direction"
                             onclick={
-                                self.link.callback(move |_| {
+                                ctx.link().callback(move |_| {
                                     Msg::Direction(ball_direction * -1)
                                 })
                             }
@@ -180,45 +176,45 @@ impl Component for Ball {
                             step="10"
                             id="delay"
                             name="delay"
-                            onchange={
-                                self.link.callback(move |ty| {
-                                    let delay = match ty {
-                                        ChangeData::Value(s) => {
-                                            s.parse().unwrap_or(100)
-                                        }
-                                        _ => 100,
-                                    };
-                                    Msg::Delay(delay)
-                                })
-                            }
-                            oninput={
-                                self.link.callback(move |ty:InputData| {
-                                    let delay = ty.value.parse().unwrap_or(100);
-                                    Msg::Delay(delay)
-                                })
-                            }
-                            value= { self.props.ball.delay.num_milliseconds().to_string() }
+                            // onchange={
+                            //     ctx.link().callback(move |ty| {
+                            //         let delay = match ty {
+                            //             ChangeData::Value(s) => {
+                            //                 s.parse().unwrap_or(100)
+                            //             }
+                            //             _ => 100,
+                            //         };
+                            //         Msg::Delay(delay)
+                            //     })
+                            // }
+                            // oninput={
+                            //     ctx.link().callback(move |ty:InputData| {
+                            //         let delay = ty.value.parse().unwrap_or(100);
+                            //         Msg::Delay(delay)
+                            //     })
+                            // }
+                            value= { ctx.props().ball.delay.num_milliseconds().to_string() }
                         />
                         <label>
                             <input type="number" name="delay" id="delay_real" class="input"
-                                onchange={
-                                    self.link.callback(move |ty| {
-                                        let delay = match ty {
-                                            ChangeData::Value(s) => {
-                                                s.parse().unwrap_or(100)
-                                            }
-                                            _ => 100,
-                                        };
-                                        Msg::Delay(delay)
-                                    })
-                                }
-                                oninput={
-                                    self.link.callback(move |ty:InputData| {
-                                        let delay = ty.value.parse().unwrap_or(100);
-                                        Msg::Delay(delay)
-                                    })
-                                }
-                                value= { self.props.ball.delay.num_milliseconds().to_string() }
+                                // onchange={
+                                //     ctx.link().callback(move |ty| {
+                                //         let delay = match ty {
+                                //             ChangeData::Value(s) => {
+                                //                 s.parse().unwrap_or(100)
+                                //             }
+                                //             _ => 100,
+                                //         };
+                                //         Msg::Delay(delay)
+                                //     })
+                                // }
+                                // oninput={
+                                //     ctx.link().callback(move |ty:InputData| {
+                                //         let delay = ty.value.parse().unwrap_or(100);
+                                //         Msg::Delay(delay)
+                                //     })
+                                // }
+                                value= { ctx.props().ball.delay.num_milliseconds().to_string() }
                             /><a class="button is-static">{ "ms" }</a></label>
                     </ybc::Control>
                 </ybc::Field>

@@ -1,19 +1,18 @@
 use chrono::Duration;
 use palette::LinSrgb;
 
+use wasm_bindgen::{JsCast, UnwrapThrowExt};
+use web_sys::HtmlInputElement;
 use yew::prelude::*;
-use yewtil::NeqAssign;
 
 #[derive(Clone, Debug)]
 pub(crate) struct Glow {
-    link: ComponentLink<Self>,
-
-    props: Props,
+    effect: lights::effects::Glow,
 }
 
 impl Glow {
     fn to_effect(&self) -> lights::effects::Glow {
-        self.props.glow.clone()
+        self.effect.clone()
     }
 }
 
@@ -38,63 +37,55 @@ impl Component for Glow {
 
     type Properties = Props;
 
-    fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
-        Self { link, props }
+    fn create(ctx: &Context<Self>) -> Self {
+        Self {
+            effect: ctx.props().glow.clone(),
+        }
     }
 
-    fn update(&mut self, msg: Self::Message) -> ShouldRender {
+    fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
         match msg {
-            Msg::AddColor => self.props.glow.add_color(LinSrgb::new(255, 0, 0)),
-            Msg::ReplaceColor(idx, color) => self.props.glow.set_color(idx, color),
-            Msg::RemoveColor(idx) => self.props.glow.remove_color(idx),
+            Msg::AddColor => self.effect.add_color(LinSrgb::new(255, 0, 0)),
+            Msg::ReplaceColor(idx, color) => self.effect.set_color(idx, color),
+            Msg::RemoveColor(idx) => self.effect.remove_color(idx),
             Msg::Delay(delay) => {
-                self.props.glow.delay = Duration::milliseconds(delay);
+                self.effect.delay = Duration::milliseconds(delay);
             }
-            Msg::Steps(steps) => self.props.glow.steps = steps as usize,
+            Msg::Steps(steps) => self.effect.steps = steps as usize,
         };
-        self.props
+        ctx.props()
             .onupdate
             .as_ref()
             .map(|u| u.emit(self.to_effect()));
         true
     }
 
-    fn change(&mut self, props: Self::Properties) -> ShouldRender {
-        self.props.neq_assign(props)
-    }
-
-    fn view(&self) -> Html {
-        let link = self.link.clone();
-        let colors = self.props.glow.colors();
+    fn view(&self, ctx: &Context<Self>) -> Html {
+        let link = ctx.link();
+        let colors = ctx.props().glow.colors();
         let colors = colors.iter().cloned().enumerate().map(|(idx, color)| {
             html! {
                 <ybc::Field>
                     <input type="color"
                         value={ format!("#{:02x}{:02x}{:02x}", color.red, color.green, color.blue) }
-                        onchange={ link.callback(move |c: ChangeData| {
-                            match &c {
-                                ChangeData::Value(v) => {
-                                    let mut buf = [0_u8; 3];
-                                    let s = v.trim_start_matches('#');
-                                    let v = hex::decode_to_slice(s, &mut buf);
-                                    if v.is_err() {
-                                        return Msg::ReplaceColor(idx, color.clone());
-                                    }
-
-                                    Msg::ReplaceColor(idx, LinSrgb::new(buf[0], buf[1], buf[2]))
-
-                                }
-                                _ => {
-                                    log::error!("Wong changedata type");
-                                    unreachable!("wrong changedata type?")
-                                },
+                        onchange={ link.callback(move |c: Event| {
+                            let target: HtmlInputElement = c.target().expect("should have target").dyn_into().unwrap_throw();
+                            let value = target.value();
+                            let mut buf = [0_u8; 3];
+                            let s = value.trim_start_matches('#');
+                            let v = hex::decode_to_slice(s, &mut buf);
+                            if v.is_err() {
+                                return Msg::ReplaceColor(idx, color.clone());
                             }
+
+                            Msg::ReplaceColor(idx, LinSrgb::new(buf[0], buf[1], buf[2]))
+
                         }) }
                     />
                     <ybc::Control>
                         <input type="button"
                             onclick={
-                                self.link.callback(move |_| {
+                                ctx.link().callback(move |_| {
                                     Msg::RemoveColor(idx)
                                 })
                             }
@@ -112,7 +103,7 @@ impl Component for Glow {
                     <ybc::Control>
                         <input type="button"
                             onclick={
-                                self.link.callback(move |_| {
+                                ctx.link().callback(move |_| {
                                     Msg::AddColor
                                 })
                             }
@@ -131,44 +122,42 @@ impl Component for Glow {
                             id="steps"
                             name="steps"
                             onchange={
-                                self.link.callback(move |ty| {
-                                    let steps = match ty {
-                                        ChangeData::Value(s) => {
-                                            s.parse().unwrap_or(10)
-                                        }
-                                        _ => 10,
-                                    };
+                                ctx.link().callback(move |ty: Event| {
+                                    let target: HtmlInputElement = ty.target().expect("Should have target").dyn_into().unwrap_throw();
+                                    let value = target.value();
+                                    let steps = value.parse().unwrap_or(10);
                                     Msg::Steps(steps)
                                 })
                             }
                             oninput={
-                                self.link.callback(move |ty:InputData| {
-                                    let steps = ty.value.parse().unwrap_or(10);
+                                ctx.link().callback(move |ty:InputEvent| {
+                                    let event: Event = ty.dyn_into().unwrap_throw();
+                                    let target: HtmlInputElement = event.target().unwrap_throw().dyn_into().unwrap_throw();
+                                    let steps = target.value().parse().unwrap_or(10);
                                     Msg::Steps(steps)
                                 })
                             }
-                            value= { self.props.glow.steps.to_string() }
+                            value= { ctx.props().glow.steps.to_string() }
                         />
                         <label>
                             <input type="number" name="steps" id="steps_real" class="input"
                                 onchange={
-                                    self.link.callback(move |ty| {
-                                        let steps = match ty {
-                                            ChangeData::Value(s) => {
-                                                s.parse().unwrap_or(10)
-                                            }
-                                            _ => 10,
-                                        };
+                                    ctx.link().callback(move |ty: Event| {
+                                        let target: HtmlInputElement = ty.target().expect("Should have target").dyn_into().unwrap_throw();
+                                        let value = target.value();
+                                        let steps = value.parse().unwrap_or(10);
                                         Msg::Steps(steps)
                                     })
                                 }
                                 oninput={
-                                    self.link.callback(move |ty:InputData| {
-                                        let steps = ty.value.parse().unwrap_or(10);
+                                    ctx.link().callback(move |ty: InputEvent| {
+                                        let event: Event = ty.dyn_into().unwrap_throw();
+                                        let target: HtmlInputElement = event.target().unwrap_throw().dyn_into().unwrap_throw();
+                                        let steps = target.value().parse().unwrap_or(10);
                                         Msg::Steps(steps)
                                     })
                                 }
-                                value= { self.props.glow.steps.to_string() }
+                                value= { ctx.props().glow.steps.to_string() }
                             /><a class="button is-static">{ "ms" }</a></label>
                     </ybc::Control>
                 </ybc::Field>
@@ -183,44 +172,44 @@ impl Component for Glow {
                             id="delay"
                             name="delay"
                             onchange={
-                                self.link.callback(move |ty| {
-                                    let delay = match ty {
-                                        ChangeData::Value(s) => {
-                                            s.parse().unwrap_or(100)
-                                        }
-                                        _ => 100,
-                                    };
+                                ctx.link().callback(move |ty: Event| {
+                                    let target: HtmlInputElement = ty.target().unwrap_throw().dyn_into().unwrap_throw();
+                                    let value = target.value();
+                                    let delay = value.parse().unwrap_or(100);
                                     Msg::Delay(delay)
                                 })
                             }
                             oninput={
-                                self.link.callback(move |ty:InputData| {
-                                    let delay = ty.value.parse().unwrap_or(100);
+                                ctx.link().callback(move |ty:InputEvent| {
+                                    let event: Event = ty.dyn_into().unwrap_throw();
+                                    let target: HtmlInputElement = event.target().unwrap_throw().dyn_into().unwrap_throw();
+                                    let value = target.value();
+                                    let delay = value.parse().unwrap_or(100);
                                     Msg::Delay(delay)
                                 })
                             }
-                            value= { self.props.glow.delay.num_milliseconds().to_string() }
+                            value= { ctx.props().glow.delay.num_milliseconds().to_string() }
                         />
                         <label>
                             <input type="number" name="delay" id="delay_real" class="input"
                                 onchange={
-                                    self.link.callback(move |ty| {
-                                        let delay = match ty {
-                                            ChangeData::Value(s) => {
-                                                s.parse().unwrap_or(100)
-                                            }
-                                            _ => 100,
-                                        };
+                                    ctx.link().callback(move |ty: Event| {
+                                        let target: HtmlInputElement = ty.target().unwrap_throw().dyn_into().unwrap_throw();
+                                        let value = target.value();
+                                        let delay = value.parse().unwrap_or(100);
                                         Msg::Delay(delay)
                                     })
                                 }
                                 oninput={
-                                    self.link.callback(move |ty:InputData| {
-                                        let delay = ty.value.parse().unwrap_or(100);
-                                        Msg::Delay(delay)
+                                    ctx.link().callback(move |ty:InputEvent| {
+                                        let event: Event = ty.dyn_into().unwrap_throw();
+                                        let target: HtmlInputElement = event.target().unwrap_throw().dyn_into().unwrap_throw();
+                                        let value = target.value();
+                                        let delay = value.parse().unwrap_or(100);
+                                            Msg::Delay(delay)
                                     })
                                 }
-                                value= { self.props.glow.delay.num_milliseconds().to_string() }
+                                value= { ctx.props().glow.delay.num_milliseconds().to_string() }
                             /><a class="button is-static">{ "ms" }</a></label>
                     </ybc::Control>
                 </ybc::Field>

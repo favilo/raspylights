@@ -4,10 +4,7 @@ use lights::effects::{Effect, EffectType};
 use palette::LinSrgb;
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::HtmlCanvasElement;
-use yew::{
-    prelude::*,
-    services::{timeout::TimeoutTask, TimeoutService},
-};
+use yew::prelude::*;
 
 #[derive(Clone, PartialEq, Properties)]
 pub(crate) struct Props {
@@ -23,11 +20,8 @@ pub(crate) enum Msg {
 }
 
 pub(crate) struct Preview {
-    link: ComponentLink<Self>,
-    props: Props,
-
     pixels: Vec<LinSrgb<u8>>,
-    timer: Option<Box<TimeoutTask>>,
+    // timer: Option<Box<TimeoutTask>>,
     canvas: NodeRef,
     effect: Box<dyn Effect>,
 }
@@ -37,15 +31,13 @@ impl Component for Preview {
 
     type Properties = Props;
 
-    fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
-        let pixels = vec![Default::default(); props.length];
-        let effect = props.effect.clone().into_inner();
+    fn create(ctx: &Context<Self>) -> Self {
+        let pixels = vec![Default::default(); ctx.props().length];
+        let effect = ctx.props().effect.clone().into_inner();
         let mut this = Self {
-            link,
-            props,
             pixels,
             effect,
-            timer: None,
+            // timer: None,
             canvas: Default::default(),
         };
         let dur = this
@@ -56,13 +48,13 @@ impl Component for Preview {
         this
     }
 
-    fn update(&mut self, msg: Self::Message) -> ShouldRender {
+    fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
         match msg {
             Msg::Tick(t) => {
                 self.pixels
                     .iter_mut()
                     .for_each(|c| *c = LinSrgb::new(0, 0, 0));
-                self.timer = None;
+                // self.timer = None;
                 let dur = self
                     .effect
                     .render(&mut self.pixels, t)
@@ -77,23 +69,7 @@ impl Component for Preview {
         }
     }
 
-    fn change(&mut self, props: Self::Properties) -> ShouldRender {
-        let mut changed = false;
-        if props.length != self.props.length {
-            self.pixels.resize(props.length, Default::default());
-            changed = true;
-        }
-        if props.effect != self.props.effect {
-            self.props.effect = props.effect;
-            self.effect = self.props.effect.clone().into_inner();
-            let dur = self.effect.render(&mut self.pixels, now()).unwrap();
-            self.set_timer(dur);
-            changed = true;
-        }
-        changed
-    }
-
-    fn view(&self) -> Html {
+    fn view(&self, _ctx: &Context<Self>) -> Html {
         html! {
             <canvas
                 width=1000
@@ -107,11 +83,11 @@ impl Component for Preview {
 
 impl Preview {
     fn set_timer(&mut self, dur: Duration) {
-        let handle: TimeoutTask = TimeoutService::spawn(
-            std::time::Duration::from_millis(dur.num_milliseconds().try_into().unwrap()),
-            self.link.callback(|_| Msg::Tick(now())),
-        );
-        self.timer = Some(Box::new(handle));
+        // let handle: TimeoutTask = TimeoutService::spawn(
+        //     std::time::Duration::from_millis(dur.num_milliseconds().try_into().unwrap()),
+        //     self.link.callback(|_| Msg::Tick(now())),
+        // );
+        // self.timer = Some(Box::new(handle));
     }
 
     fn render_pixels(&self) -> Result<(), anyhow::Error> {

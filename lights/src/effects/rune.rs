@@ -8,10 +8,13 @@ use std::{
 
 use chrono::TimeZone;
 use once_cell::sync::Lazy;
-use rune::{termcolor::StandardStream, Diagnostics, EmitDiagnostics, Options, Sources};
-use runestick::{
-    debug::DebugArgs, Any, Component, Context, RuntimeContext, Source, Unit, Value, Vm,
+use rune::{
+    alloc::{prelude::TryClone, Box},
+    compile::Component,
+    runtime::{debug::DebugArgs, RuntimeContext},
+    Any, Context, Source, Unit, Value, Vm,
 };
+use rune::{termcolor::StandardStream, Diagnostics, Options, Sources};
 
 use serde::{Deserialize, Serialize};
 
@@ -21,24 +24,42 @@ use super::{Effect, EffectType, Instant};
 
 static REQUIRED_FNS: Lazy<HashMap<Component, DebugArgs>> = Lazy::new(|| {
     [
-        ("init", DebugArgs::Named(vec![])),
+        (
+            "init",
+            DebugArgs::Named(Box::from_std(vec![].into_boxed_slice()).unwrap()),
+        ),
         (
             "render",
-            DebugArgs::Named(vec![
-                "state".to_string(),
-                "pixels".to_string(),
-                "t".to_string(),
-            ]),
+            DebugArgs::Named(
+                Box::from_std(
+                    vec![
+                        Box::from_std("state".to_string().into_boxed_str()).unwrap(),
+                        Box::from_std("pixels".to_string().into_boxed_str()).unwrap(),
+                        Box::from_std("t".to_string().into_boxed_str()).unwrap(),
+                    ]
+                    .into_boxed_slice(),
+                )
+                .unwrap(),
+            ),
         ),
         (
             "is_ready",
-            DebugArgs::Named(vec!["state".to_string(), "t".to_string()]),
+            DebugArgs::Named(
+                Box::from_std(
+                    vec![
+                        Box::from_std("state".to_string().into_boxed_str()).unwrap(),
+                        Box::from_std("t".to_string().into_boxed_str()).unwrap(),
+                    ]
+                    .into_boxed_slice(),
+                )
+                .unwrap(),
+            ),
         ),
     ]
     .into_iter()
     .map(|(n, a)| (n.to_owned(), a))
     .map(|(n, a)| (n.into_boxed_str(), a))
-    .map(|b| (Component::Str(b.0), b.1))
+    .map(|b| (Component::Str(Box::from_std(b.0).unwrap()), b.1))
     .collect()
 });
 
@@ -65,17 +86,23 @@ impl RuneScript {
         // TODO: Figure out which functions and stuff we want to provide to Rune
         let mut context = Context::with_default_modules()?;
         context.install(&types::module()?)?;
+        log::info!("Loading source: {sourcecode:?}");
 
         let options = Options::default();
         let mut sources = Sources::new();
-        sources.insert(Source::new("main", &sourcecode.to_string()));
+        sources.insert(Source::new("main", &sourcecode.to_string())?)?;
+        log::info!("inserted source: {sources:?}");
 
         let mut diagnostics = Diagnostics::new();
-        let result = rune::load_sources(&context, &options, &mut sources, &mut diagnostics);
+        let result = rune::prepare(&mut sources)
+            .with_context(&context)
+            .with_options(&options)
+            .with_diagnostics(&mut diagnostics)
+            .build();
 
         if !diagnostics.is_empty() {
             let mut writer = StandardStream::stderr(rune::termcolor::ColorChoice::Always);
-            diagnostics.emit_diagnostics(&mut writer, &sources)?;
+            diagnostics.emit(&mut writer, &sources)?;
             // Ideally we won't get here, and I can just not make this more awesome.
             return Err(RuneError::Compilation("Error compiling".into()).into());
         }
@@ -85,12 +112,12 @@ impl RuneScript {
 
         let unit = Arc::new(unit);
         let context = Arc::new(context);
-        let runtime = Arc::new(context.runtime());
+        let runtime = Arc::new(context.runtime()?);
 
-        let vm = Vm::new(Arc::clone(&runtime), Arc::clone(&unit));
+        let mut vm = Vm::new(Arc::clone(&runtime), Arc::clone(&unit));
         let private_data = vm.call(&["init"], ())?;
         log::info!("Loaded private_data: {:?}", private_data);
-        log::info!("private_data info: {:#?}", private_data.type_info()?);
+        // log::info!("private_data info: {:#?}", private_data.type_info());
         if let Value::Object(ref o) = private_data {
             log::info!("private_data info: {:#?}", o);
         }
@@ -117,13 +144,18 @@ impl RuneScript {
             .collect::<Vec<_>>();
         let found_req_fns = function_signatures
             .iter()
-            .map(|&di| di.path.as_vec().last().unwrap().to_owned())
-            .filter(|component: &Component| REQUIRED_FNS.contains_key(&component))
+            .map(|&di| {
+                let v = di.path.as_vec().expect("should exist");
+                let v = v.last().unwrap();
+                TryClone::try_clone(v).unwrap()
+            })
+            .filter(|component: &Component| REQUIRED_FNS.contains_key(component))
             .collect::<HashSet<Component>>();
         let reqd = REQUIRED_FNS
             .keys()
             .into_iter()
-            .cloned()
+            .map(TryClone::try_clone)
+            .map(Result::unwrap)
             .collect::<HashSet<_>>();
         let missing_fns = reqd.difference(&found_req_fns).collect::<Vec<_>>();
         if !missing_fns.is_empty() {
@@ -138,7 +170,7 @@ impl RuneScript {
             .values()
             .filter_map(|di| {
                 REQUIRED_FNS
-                    .get(di.path.as_vec().last().unwrap())
+                    .get(di.path.as_vec().ok()?.last().unwrap())
                     .map(|v| (v, di))
             })
             .filter(|(v, di)| format!("{:?}", v) != format!("{:?}", di.args))
@@ -167,7 +199,7 @@ impl Effect for RuneScript {
         pixels: &mut [palette::LinSrgb<u8>],
         t: super::Instant,
     ) -> crate::error::Result<chrono::Duration> {
-        let vm = Vm::new(Arc::clone(&self.runtime), Arc::clone(&self.unit));
+        let mut vm = Vm::new(Arc::clone(&self.runtime), Arc::clone(&self.unit));
         let state = &self.private_data;
         let mut scrixels: types::Scrixels = pixels.into();
 
@@ -176,6 +208,7 @@ impl Effect for RuneScript {
             .map_err(RuneError::from)
             .map_err(Error::from)?
             .into_integer()
+            .into_result()
             .map_err(RuneError::from)
             .map_err(Error::from)?;
         for (i, pixel) in pixels.iter_mut().enumerate() {
@@ -185,13 +218,14 @@ impl Effect for RuneScript {
     }
 
     fn is_ready(&self, t: Instant) -> Result<bool> {
-        let vm = Vm::new(Arc::clone(&self.runtime), Arc::clone(&self.unit));
+        let mut vm = Vm::new(Arc::clone(&self.runtime), Arc::clone(&self.unit));
         let state = &self.private_data;
         let ready = vm
             .call(&["is_ready"], (state, t.timestamp_millis()))
             .map_err(RuneError::from)
             .map_err(Error::from)?
             .as_bool()
+            .into_result()
             .map_err(RuneError::from)
             .map_err(Error::from)?;
         Ok(ready)

@@ -1,5 +1,5 @@
 use palette::LinSrgb;
-use runestick::{Any, ContextError, Module, Protocol};
+use rune::{Any, ContextError, Module};
 
 #[derive(Debug, Clone, Any)]
 #[repr(transparent)]
@@ -32,10 +32,10 @@ impl From<&mut [LinSrgb<u8>]> for Scrixels {
 }
 
 pub(crate) fn module() -> Result<Module, ContextError> {
-    let mut module = Module::with_item(&["rgb"]);
+    let mut module = Module::with_item(&["rgb"])?;
     module.ty::<Scrixels>()?;
-    module.inst_fn("set", Scrixels::set)?;
-    module.inst_fn("get", Scrixels::get)?;
-    module.inst_fn("len", Scrixels::len)?;
+    module.associated_function("set", Scrixels::set)?;
+    module.associated_function("get", Scrixels::get)?;
+    module.associated_function("len", Scrixels::len)?;
     Ok(module)
 }

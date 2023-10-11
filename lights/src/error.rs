@@ -30,17 +30,20 @@ pub enum RuneError {
     NoDebugInfo,
 
     #[error("Rune Error")]
-    Rune(#[from] rune::Error),
+    Rune(#[from] rune::alloc::Error),
+
+    #[error("Build Error: {0}")]
+    Build(#[from] rune::BuildError),
 
     #[error("Context Error")]
-    Context(#[from] runestick::ContextError),
+    Context(#[from] rune::ContextError),
 
-    #[error("Diagnostic Error")]
-    Diagnostic(#[from] rune::DiagnosticsError),
+    #[error("Diagnostic Error: {0:?}")]
+    Diagnostic(#[from] rune::diagnostics::FatalDiagnostic),
 
-    #[error("Load Sources Error")]
-    LoadSources(#[from] rune::LoadSourcesError),
+    #[error("Emit Error")]
+    LoadSources(#[from] rune::diagnostics::EmitError),
 
     #[error("Runtime Error")]
-    VmError(#[from] runestick::VmError),
+    VmError(#[from] rune::runtime::VmError),
 }

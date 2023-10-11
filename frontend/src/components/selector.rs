@@ -4,9 +4,7 @@ use yew::prelude::*;
 
 #[derive(Clone, Debug)]
 pub(crate) struct Selector {
-    link: ComponentLink<Self>,
-
-    props: Props,
+    ty: &'static str,
 }
 
 pub(crate) enum Msg {
@@ -33,32 +31,28 @@ impl Component for Selector {
 
     type Properties = Props;
 
-    fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
-        Self { link, props }
+    fn create(ctx: &Context<Self>) -> Self {
+        Self { ty: ctx.props().ty }
     }
 
-    fn update(&mut self, msg: Self::Message) -> ShouldRender {
+    fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
         // TODO: We need to figure out what type of message we need to support
         match msg {
-            Msg::SetType(ty) => self.props.ty = ty,
+            Msg::SetType(ty) => self.ty = ty,
         }
-        self.props.onclick.as_ref().map(|u| u.emit(self.props.ty));
+        ctx.props().onclick.as_ref().map(|u| u.emit(self.ty));
         true
     }
 
-    fn change(&mut self, _props: Self::Properties) -> ShouldRender {
-        true
-    }
-
-    fn view(&self) -> Html {
+    fn view(&self, ctx: &Context<Self>) -> Html {
         let effects = EffectType::iter_names().collect::<Vec<_>>();
         let options: Vec<_> = effects
             .iter()
             .cloned()
-            .filter(|ty| !(self.props.internal && ty == &"Rune Script"))
+            .filter(|ty| !(ctx.props().internal && ty == &"Rune Script"))
             .map(|i| {
                 let id = format!("{}", i);
-                let classes = if i == self.props.ty {
+                let classes = if i == ctx.props().ty {
                     classes!("is-active")
                 } else {
                     classes!()
@@ -66,14 +60,14 @@ impl Component for Selector {
                 html! {
                     <li
                         class={ classes }
-                        onclick={ self.link.callback(move |_| Msg::SetType(i)) }>
+                        onclick={ ctx.link().callback(move |_| Msg::SetType(i)) }>
                         <a>{id}</a>
                     </li>
                 }
             })
             .collect::<_>();
 
-        let id_str = format!("effect_select_{}", self.props.id);
+        let id_str = format!("effect_select_{}", ctx.props().id);
 
         html! {
             <ybc::Tabs

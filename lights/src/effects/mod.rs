@@ -3,9 +3,10 @@ use std::{fmt::Debug, iter, str::FromStr};
 
 use chrono::{serde::ts_milliseconds_option, DateTime, Duration, Utc};
 use dyn_clone::DynClone;
+use enterpolation::{linear::ConstEquidistantLinear, Curve};
 use enum_dispatch::enum_dispatch;
 use mopa::mopafy;
-use palette::{convert::FromColor, Gradient, Hsv, LinSrgb};
+use palette::{convert::FromColor, Hsv, LinSrgb};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationMilliSeconds};
 
@@ -512,13 +513,11 @@ impl Default for Glow {
 impl Effect for Glow {
     fn render(&mut self, pixels: &mut [LinSrgb<u8>], t: Instant) -> Result<Duration> {
         let color: LinSrgb<u8> = if self.is_ready(t)? {
-            let gradient = Gradient::new(vec![
-                Hsv::from_color(self.colors[self.color_idx].into_format()),
-                Hsv::from_color(
-                    self.colors[(self.color_idx + 1) % self.colors.len()].into_format(),
-                ),
+            let gradient = ConstEquidistantLinear::<f32, _, 2>::equidistant_unchecked([
+                self.colors[self.color_idx].into_format::<f32>(),
+                self.colors[(self.color_idx + 1) % self.colors.len()].into_format(),
             ]);
-            let color = gradient.get(self.step as f32 / self.steps as f32);
+            let color = gradient.take(self.steps).skip(self.step).next().unwrap();
             self.step += 1;
             if self.step == self.steps {
                 self.step = 0;
@@ -526,7 +525,7 @@ impl Effect for Glow {
             }
 
             self.next_update = Some(t + self.delay);
-            LinSrgb::from_color(color).into_format()
+            color.into_format()
         } else {
             LinSrgb::new(0, 0, 0)
         };
