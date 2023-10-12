@@ -95,7 +95,6 @@ impl Component for App {
     fn view(&self, ctx: &Context<Self>) -> Html {
         let dropdown = self.view_selector(ctx);
         let preview = self.view_preview();
-        log::info!("Preview made: {:#?}", preview);
         let effect = self.view_own_effect(ctx);
         html! {
             <>
@@ -224,7 +223,6 @@ impl App {
     }
 
     fn view_preview(&self) -> Html {
-        log::info!("Rendering preview of {:#?}", self.model.details.effect);
         html! {
             <components::Preview
                 length = { self.model.details.length }

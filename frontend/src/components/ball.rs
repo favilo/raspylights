@@ -111,7 +111,7 @@ impl Component for Ball {
                             ctx.link().callback(move |c: Event| {
                                 let target: HtmlInputElement = c.target().unwrap_throw().dyn_into().unwrap_throw();
                                 let value = target.value();
-                                let pos = value.parse().unwrap_or(100);
+                                let pos = value.parse().unwrap_or(0);
                                 Msg::Pos(pos)
                             })
                         }

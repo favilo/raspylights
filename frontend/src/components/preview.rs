@@ -33,7 +33,6 @@ impl Component for Preview {
     type Properties = Props;
 
     fn create(ctx: &Context<Self>) -> Self {
-        log::info!("creating preview");
         let pixels = vec![Default::default(); ctx.props().length];
         let effect = ctx.props().effect.clone().into_inner();
         let mut this = Self {
@@ -48,6 +47,13 @@ impl Component for Preview {
             .unwrap_or(Duration::milliseconds(50));
         this.set_timer(ctx, dur);
         this
+    }
+
+    fn changed(&mut self, ctx: &Context<Self>, old_props: &Self::Properties) -> bool {
+        if ctx.props().effect != old_props.effect {
+            self.effect = ctx.props().effect.clone().into_inner();
+        }
+        true
     }
 
     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
@@ -72,7 +78,6 @@ impl Component for Preview {
     }
 
     fn view(&self, _ctx: &Context<Self>) -> Html {
-        log::info!("Rendering canvas");
         html! {
             <canvas
                 width=1000
