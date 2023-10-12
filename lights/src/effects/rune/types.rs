@@ -6,14 +6,17 @@ use rune::{Any, ContextError, Module};
 pub(crate) struct Scrixels(pub(crate) Vec<LinSrgb<u8>>);
 
 impl Scrixels {
+    #[rune::function]
     fn set(&mut self, idx: usize, (r, g, b): (u8, u8, u8)) {
         self.0[idx] = LinSrgb::new(r, g, b);
     }
 
+    #[rune::function]
     fn get(&self, idx: usize) -> Option<(u8, u8, u8)> {
         self.0.get(idx).map(|r| r.into_components())
     }
 
+    #[rune::function]
     fn len(&self) -> usize {
         self.0.len()
     }
@@ -32,10 +35,11 @@ impl From<&mut [LinSrgb<u8>]> for Scrixels {
 }
 
 pub(crate) fn module() -> Result<Module, ContextError> {
-    let mut module = Module::with_item(&["rgb"])?;
+    // let mut module = Module::with_item(["rgb"])?;
+    let mut module = Module::new();
     module.ty::<Scrixels>()?;
-    module.associated_function("set", Scrixels::set)?;
-    module.associated_function("get", Scrixels::get)?;
-    module.associated_function("len", Scrixels::len)?;
+    module.function_meta(Scrixels::set)?;
+    module.function_meta(Scrixels::get)?;
+    module.function_meta(Scrixels::len)?;
     Ok(module)
 }

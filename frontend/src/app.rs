@@ -1,7 +1,9 @@
+use gloo::net::http::Request;
 use gloo_storage::{LocalStorage, Storage};
 use lights::{details::Details, effects::EffectType};
-use serde_json::json;
-use yew::prelude::*;
+use wasm_bindgen::{JsCast, UnwrapThrowExt};
+use web_sys::HtmlInputElement;
+use yew::{platform::spawn_local, prelude::*};
 
 use crate::{
     components,
@@ -20,14 +22,12 @@ pub struct App {
 #[derive(Debug)]
 struct Model {
     details: Details,
-    // task: Option<FetchTask>,
 }
 
 impl Default for Model {
     fn default() -> Self {
         Self {
             details: Default::default(),
-            // task: None,
         }
     }
 }
@@ -68,11 +68,9 @@ impl Component for App {
             Msg::FetchDetails(l, b) => {
                 self.model.details.length = l;
                 self.model.details.brightness = b;
-                // self.model.task = None;
                 false
             }
             Msg::PostStatus(details) => {
-                // self.model.task = None;
                 self.model.details = details;
                 false
             }
@@ -88,68 +86,58 @@ impl Component for App {
 
         if store {
             log::debug!("Storing: {:?}", self.model.details);
-            self.store_current_effect();
+            self.store_current_effect(ctx);
         }
 
         true
     }
 
     fn view(&self, ctx: &Context<Self>) -> Html {
-        let dropdown = self.view_selector();
+        let dropdown = self.view_selector(ctx);
         let preview = self.view_preview();
+        log::info!("Preview made: {:#?}", preview);
         let effect = self.view_own_effect(ctx);
         html! {
             <>
-                // // The layer of details
-                // // <div class="box" name="strip_details">
-                // <ybc::Box classes={ classes!("strip_details") }>
-                //     <label for="strip_length">{ "Number of LEDs" }</label>
-                //     <input type="number"
-                //         name="strip_length"
-                //         id="strip_length"
-                //         value={ self.model.details.length.to_string() }
-                //         // onchange={
-                //         //     ctx.link().callback(|c: ChangeData|{
-                //         //         match c {
-                //         //             ChangeData::Value(v) => {
-                //         //                 Msg::Length(v.parse().unwrap_or(100))
-                //         //             }
-                //         //             _ => {
-                //         //                 log::error!("Wrong ChangeData type");
-                //         //                 unreachable!("Should not have been possible for this input type")
-                //         //             }
-                //         //         }
-                //         //     })
-                //         // }
-                //     />
-                //     <label for="strip_brightness">{ "Strip Brightness (0-255)" }</label>
-                //     <input type="number"
-                //         name="strip_brightness"
-                //         id="strip_brightness"
-                //         value={ self.model.details.brightness.to_string() }
-                //         // onchange={
-                //         //     ctx.link().callback(|c: ChangeData|{
-                //         //         match c {
-                //         //             ChangeData::Value(v) => {
-                //         //                 Msg::Brightness(v.parse().unwrap_or(255))
-                //         //             }
-                //         //             _ => {
-                //         //                 log::error!("Wrong ChangeData type");
-                //         //                 unreachable!("Should not have been possible for this input type")
-                //         //             }
-                //         //         }
-                //         //     })
-                //         // }
-                //     />
-                // </ybc::Box>
-                // <ybc::Box classes={ classes!("main_preview") }>
-                //     { preview }
-                // </ybc::Box>
-                // // The effects
-                // <ybc::Box classes={ classes!("effect-select") }>
-                //     { dropdown }
-                //     <div class="effect">{ effect }</div>
-                // </ybc::Box>
+                // The layer of details
+                <ybc::Box classes={ classes!("strip_details") }>
+                    <label for="strip_length">{ "Number of LEDs" }</label>
+                    <input type="number"
+                        name="strip_length"
+                        id="strip_length"
+                        value={ self.model.details.length.to_string() }
+                        onchange={
+                            ctx.link().callback(|c: Event|{
+                                let target: HtmlInputElement = c.target().unwrap_throw().dyn_into().unwrap_throw();
+                                let value = target.value();
+                                Msg::Length(value.parse().unwrap_or(100))
+                            })
+                        }
+                    />
+                    <label for="strip_brightness">{ "Strip Brightness (0-255)" }</label>
+                    <input type="number"
+                        name="strip_brightness"
+                        id="strip_brightness"
+                        min="10"
+                        max="1000"
+                        value={ self.model.details.brightness.to_string() }
+                        onchange={
+                            ctx.link().callback(|e: Event|{
+                                let target: HtmlInputElement = e.target().unwrap_throw().dyn_into().unwrap_throw();
+                                let value = target.value();
+                                Msg::Brightness(value.parse().unwrap_or(127))
+                            })
+                        }
+                    />
+                </ybc::Box>
+                <ybc::Box classes={ classes!("main_preview") }>
+                    { preview }
+                </ybc::Box>
+                // The effects
+                <ybc::Box classes={ classes!("effect-select") }>
+                    { dropdown }
+                    <div class="effect">{ effect }</div>
+                </ybc::Box>
             </>
         }
     }
@@ -157,83 +145,86 @@ impl Component for App {
 
 impl App {
     fn load_model(ctx: &Context<Self>) -> Result<Model, anyhow::Error> {
-        let effect_str = LocalStorage::get::<String>(EFFECT_KEY);
-        let effect = if let Ok(effect_str) = effect_str {
-            let effect: Result<EffectType, _> = serde_json::from_str(&effect_str);
-            log::info!("Loading: {:?}", effect);
-            effect.unwrap_or_else(|_| Default::default())
-        } else {
-            Default::default()
-        };
-        // let req = Request::get("d")
-        //     .body(Nothing)
-        //     .expect("Need to get a length response");
-        // let callback = link.callback(move |response: Response<Json<anyhow::Result<Details>>>| {
-        //     log::info!("{:#?}", response);
-        //     let Json(data) = response.into_body();
-        //     let (l, b) = data.map(|d| (d.length, d.brightness)).unwrap_or((100, 150));
-        //     Msg::FetchDetails(l, b)
-        // });
-        // let task = FetchService::fetch(req, callback).expect("Request shouldn't fail");
+        let effect = LocalStorage::get::<EffectType>(EFFECT_KEY).unwrap_or(EffectType::default());
+        let callback = ctx.link().callback(move |response: String| {
+            let data = serde_json::from_str::<Details>(&response);
+            log::info!("Details: {:#?}", data);
+            let (l, b) = data.map(|d| (d.length, d.brightness)).unwrap_or((100, 150));
+            Msg::FetchDetails(l, b)
+        });
+        spawn_local(async move {
+            let req = Request::get("/details")
+                .send()
+                .await
+                .expect("Need to get a length response")
+                .text()
+                .await
+                .expect("Needed to get body");
+            callback.emit(req);
+        });
 
         Ok(Model {
             details: Details {
                 effect,
                 ..Details::default()
             },
-            // task: Some(task),
         })
     }
 
-    fn store_current_effect(&mut self) {
+    fn store_current_effect(&mut self, ctx: &Context<Self>) {
         let model: &Model = &self.model;
         LocalStorage::set(EFFECT_KEY, &model.details.effect).unwrap();
         let details = model.details.clone();
-        // let json = json!(&details);
-        // let req = Request::post("details")
-        //     .body(Json(&json))
-        //     .expect("Json of effect_type");
-        // let callback =
-        //     ctx.link()
-        //         .callback(move |response: Response<Json<anyhow::Result<Details>>>| {
-        //             let Json(jsvalue) = response.into_body();
-        //             let details = jsvalue.unwrap_or(details.clone());
-        //             Msg::PostStatus(details)
-        //         });
-        // let task = FetchService::fetch(req, callback).expect("Need this to go through");
-        // self.model.task = Some(task);
+        let callback = ctx.link().callback(move |response: String| {
+            let details = serde_json::from_str::<Details>(&response).unwrap_or_default();
+            Msg::PostStatus(details)
+        });
+        spawn_local(async move {
+            let req = Request::post("details")
+                .json(&details)
+                .expect("json serialized properly")
+                .send()
+                .await
+                .expect("Json of effect_type")
+                .text()
+                .await
+                .expect("Need to get body");
+            callback.emit(req);
+        })
     }
 
     fn load_last_effect(&mut self, ty: &str) -> EffectType {
         let last_effect = format!("{}.{}", LAST_EFFECT_KEY, ty);
-        let effect_str = LocalStorage::get::<String>(&last_effect);
-        if let Ok(effect_str) = effect_str {
-            let effect: Result<EffectType, _> = serde_json::from_str(&effect_str);
-            log::info!("Loading: {:?}", effect);
-            effect.unwrap_or_else(|_| EffectType::default_from_name(ty))
-        } else {
-            EffectType::default_from_name(ty)
-        }
+        let effect = LocalStorage::get::<EffectType>(&last_effect).unwrap_or_else(|_| match ty {
+            "Empty" => EffectType::Empty(lights::effects::Empty),
+            "Ball" => EffectType::Ball(lights::effects::Ball::default()),
+            "Balls" => EffectType::Balls(lights::effects::Balls::default()),
+            "Glow" => EffectType::Glow(lights::effects::Glow::default()),
+            "Rainbow" => EffectType::Rainbow(lights::effects::Rainbow::default()),
+            "Composite" => EffectType::Composite(lights::effects::Composite::default()),
+            "Rune Script" => EffectType::RuneScript(lights::effects::SourceCode::default()),
+            _ => panic!(),
+        });
+        effect
     }
 
     fn store_last_effect(&mut self, et: &EffectType) {
-        let s: String = serde_json::to_string(et).unwrap();
-        LocalStorage::set(&format!("{}.{}", LAST_EFFECT_KEY, et.name()), s);
+        LocalStorage::set(&format!("{}.{}", LAST_EFFECT_KEY, et.name()), et).unwrap();
     }
 
-    fn view_selector(&self) -> Html {
-        html! { <></> }
-        // let onclick = Some(ctx.link().callback(|ty| Msg::EffectName(ty)));
-        // html! {
-        //     <components::Selector
-        //         id = { "main" }
-        //         ty = { self.model.details.effect.name() }
-        //         onclick = { onclick }
-        //     />
-        // }
+    fn view_selector(&self, ctx: &Context<Self>) -> Html {
+        let onclick = Some(ctx.link().callback(|ty| Msg::EffectName(ty)));
+        html! {
+            <components::Selector
+                id = { "main" }
+                ty = { self.model.details.effect.name() }
+                onclick = { onclick }
+            />
+        }
     }
 
     fn view_preview(&self) -> Html {
+        log::info!("Rendering preview of {:#?}", self.model.details.effect);
         html! {
             <components::Preview
                 length = { self.model.details.length }

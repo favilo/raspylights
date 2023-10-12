@@ -1,5 +1,6 @@
 use anyhow::anyhow;
 use chrono::{DateTime, Duration, NaiveDateTime, TimeZone, Utc};
+use gloo::timers::callback::Timeout;
 use lights::effects::{Effect, EffectType};
 use palette::LinSrgb;
 use wasm_bindgen::{JsCast, JsValue};
@@ -21,7 +22,7 @@ pub(crate) enum Msg {
 
 pub(crate) struct Preview {
     pixels: Vec<LinSrgb<u8>>,
-    // timer: Option<Box<TimeoutTask>>,
+    timer: Option<Timeout>,
     canvas: NodeRef,
     effect: Box<dyn Effect>,
 }
@@ -32,19 +33,20 @@ impl Component for Preview {
     type Properties = Props;
 
     fn create(ctx: &Context<Self>) -> Self {
+        log::info!("creating preview");
         let pixels = vec![Default::default(); ctx.props().length];
         let effect = ctx.props().effect.clone().into_inner();
         let mut this = Self {
             pixels,
             effect,
-            // timer: None,
+            timer: None,
             canvas: Default::default(),
         };
         let dur = this
             .effect
             .render(&mut this.pixels, now())
             .unwrap_or(Duration::milliseconds(50));
-        this.set_timer(dur);
+        this.set_timer(ctx, dur);
         this
     }
 
@@ -54,13 +56,13 @@ impl Component for Preview {
                 self.pixels
                     .iter_mut()
                     .for_each(|c| *c = LinSrgb::new(0, 0, 0));
-                // self.timer = None;
+                self.timer = None;
                 let dur = self
                     .effect
                     .render(&mut self.pixels, t)
                     .unwrap_or(Duration::milliseconds(50));
                 if self.render_pixels().is_ok() {
-                    self.set_timer(dur);
+                    self.set_timer(ctx, dur);
                 } else {
                     log::error!("Error rendering pixels");
                 }
@@ -70,6 +72,7 @@ impl Component for Preview {
     }
 
     fn view(&self, _ctx: &Context<Self>) -> Html {
+        log::info!("Rendering canvas");
         html! {
             <canvas
                 width=1000
@@ -82,12 +85,11 @@ impl Component for Preview {
 }
 
 impl Preview {
-    fn set_timer(&mut self, dur: Duration) {
-        // let handle: TimeoutTask = TimeoutService::spawn(
-        //     std::time::Duration::from_millis(dur.num_milliseconds().try_into().unwrap()),
-        //     self.link.callback(|_| Msg::Tick(now())),
-        // );
-        // self.timer = Some(Box::new(handle));
+    fn set_timer(&mut self, ctx: &Context<Self>, dur: Duration) {
+        let link = ctx.link().clone();
+        self.timer = Some(Timeout::new(dur.num_milliseconds() as u32, move || {
+            link.send_message(Msg::Tick(now()));
+        }));
     }
 
     fn render_pixels(&self) -> Result<(), anyhow::Error> {
@@ -102,7 +104,6 @@ impl Preview {
             .dyn_into::<web_sys::CanvasRenderingContext2d>()
             .map_err(|_| anyhow!("bad cast"))?;
 
-        // let l = self.pixels.len();
         let buffer = 15.0;
         let width = canvas.width();
 

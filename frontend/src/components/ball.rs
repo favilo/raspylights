@@ -1,9 +1,8 @@
 use chrono::Duration;
-
 use palette::LinSrgb;
-
+use wasm_bindgen::{JsCast, UnwrapThrowExt};
+use web_sys::HtmlInputElement;
 use yew::prelude::*;
-use yewtil::NeqAssign;
 
 #[derive(Clone, Debug)]
 pub(crate) struct Ball {
@@ -19,7 +18,6 @@ impl Ball {
 pub(crate) enum Msg {
     Color(LinSrgb<u8>),
     Pos(usize),
-    // Count(usize),
     Direction(i8),
     Bounce(bool),
     Delay(i64),
@@ -52,9 +50,6 @@ impl Component for Ball {
             Msg::Pos(pos) => {
                 self.effect.position = pos;
             }
-            // Msg::Count(count) => {
-            //     self.effect.count = count;
-            // }
             Msg::Direction(direction) => {
                 self.effect.direction = direction;
             }
@@ -90,25 +85,18 @@ impl Component for Ball {
                         id={ "ball_color" }
                         name={ "ball_color" }
                         value={ format!("#{:02x}{:02x}{:02x}", color.red, color.green, color.blue) }
-                        // onchange={ ctx.link().callback(move |c: ChangeData| {
-                        //     match &c {
-                        //         ChangeData::Value(v) => {
-                        //             let mut buf = [0_u8; 3];
-                        //             let s = v.trim_start_matches('#');
-                        //             let v = hex::decode_to_slice(s, &mut buf);
-                        //             if v.is_err() {
-                        //                 return Msg::Color(color);
-                        //             }
+                        onchange={ ctx.link().callback(move |c: Event| {
+                            let target: HtmlInputElement = c.target().unwrap_throw().dyn_into().unwrap_throw();
+                            let value = target.value();
+                            let mut buf = [0_u8; 3];
+                            let s = value.trim_start_matches('#');
+                            let v = hex::decode_to_slice(s, &mut buf);
+                            if v.is_err() {
+                                return Msg::Color(color);
+                            }
 
-                        //             Msg::Color(LinSrgb::new(buf[0], buf[1], buf[2]))
-
-                        //         }
-                        //         _ => {
-                        //             log::error!("Wong changedata type");
-                        //             unreachable!("wrong changedata type?")
-                        //         },
-                        //     }
-                        // }) }
+                            Msg::Color(LinSrgb::new(buf[0], buf[1], buf[2]))
+                        }) }
                     />
                 </ybc::Field>
                 <ybc::Field>
@@ -116,24 +104,17 @@ impl Component for Ball {
                         { "Starting Point:" }
                     </label>
                     <input type="number"
-                        value="0"
+                        value={ ctx.props().ball.position.to_string() }
                         id="starting_point"
                         name="starting_point"
-                        // onchange={
-                        //     ctx.link().callback(move |c| {
-                        //         match c {
-                        //             ChangeData::Value(v) => {
-                        //                 let pos = v.parse().unwrap_or(100);
-                        //                 Msg::Pos(pos)
-                        //             }
-                        //             _ => {
-                        //                 log::error!("Wong changedata type");
-                        //                 unreachable!("wrong changedata type?")
-                        //             }
-                        //         }
-
-                        //     })
-                        // }
+                        onchange={
+                            ctx.link().callback(move |c: Event| {
+                                let target: HtmlInputElement = c.target().unwrap_throw().dyn_into().unwrap_throw();
+                                let value = target.value();
+                                let pos = value.parse().unwrap_or(100);
+                                Msg::Pos(pos)
+                            })
+                        }
                     />
                 </ybc::Field>
                 <ybc::Field addons={ true }>
@@ -176,44 +157,44 @@ impl Component for Ball {
                             step="10"
                             id="delay"
                             name="delay"
-                            // onchange={
-                            //     ctx.link().callback(move |ty| {
-                            //         let delay = match ty {
-                            //             ChangeData::Value(s) => {
-                            //                 s.parse().unwrap_or(100)
-                            //             }
-                            //             _ => 100,
-                            //         };
-                            //         Msg::Delay(delay)
-                            //     })
-                            // }
-                            // oninput={
-                            //     ctx.link().callback(move |ty:InputData| {
-                            //         let delay = ty.value.parse().unwrap_or(100);
-                            //         Msg::Delay(delay)
-                            //     })
-                            // }
+                            onchange={
+                                ctx.link().callback(move |ty: Event| {
+                                    let target: HtmlInputElement = ty.target().unwrap_throw().dyn_into().unwrap_throw();
+                                    let value = target.value();
+                                    let delay = value.parse().unwrap_or(100);
+                                    Msg::Delay(delay)
+                                })
+                            }
+                            oninput={
+                                ctx.link().callback(move |ty:InputEvent| {
+                                    let event: Event = ty.dyn_into().unwrap_throw();
+                                    let target: HtmlInputElement = event.target().unwrap_throw().dyn_into().unwrap_throw();
+                                    let value = target.value();
+                                    let delay = value.parse().unwrap_or(100);
+                                    Msg::Delay(delay)
+                                })
+                            }
                             value= { ctx.props().ball.delay.num_milliseconds().to_string() }
                         />
                         <label>
                             <input type="number" name="delay" id="delay_real" class="input"
-                                // onchange={
-                                //     ctx.link().callback(move |ty| {
-                                //         let delay = match ty {
-                                //             ChangeData::Value(s) => {
-                                //                 s.parse().unwrap_or(100)
-                                //             }
-                                //             _ => 100,
-                                //         };
-                                //         Msg::Delay(delay)
-                                //     })
-                                // }
-                                // oninput={
-                                //     ctx.link().callback(move |ty:InputData| {
-                                //         let delay = ty.value.parse().unwrap_or(100);
-                                //         Msg::Delay(delay)
-                                //     })
-                                // }
+                                onchange={
+                                    ctx.link().callback(move |e: Event| {
+                                        let target: HtmlInputElement = e.target().unwrap_throw().dyn_into().unwrap_throw();
+                                        let value = target.value();
+                                        let delay = value.parse().unwrap_or(100);
+                                        Msg::Delay(delay)
+                                    })
+                                }
+                                oninput={
+                                    ctx.link().callback(move |e: InputEvent| {
+                                    let event: Event = e.dyn_into().unwrap_throw();
+                                    let target: HtmlInputElement = event.target().unwrap_throw().dyn_into().unwrap_throw();
+                                    let value = target.value();
+                                    let delay = value.parse().unwrap_or(100);
+                                    Msg::Delay(delay)
+                                    })
+                                }
                                 value= { ctx.props().ball.delay.num_milliseconds().to_string() }
                             /><a class="button is-static">{ "ms" }</a></label>
                     </ybc::Control>

@@ -20,7 +20,9 @@ anyhow = "1.0.75"
 chrono = { version = "0.4.31", features = ["serde"] }
 console_error_panic_hook = "0.1.7"
 gloo = "0.10.0"
+gloo-net = "0.4.0"
 gloo-storage = "0.3.0"
+gloo-timers = "0.3.0"
 hex = "0.4.3"
 instant = {  version = "0.1.12", features = ["web-sys", "wasm-bindgen", "inaccurate"] }
 lights = { path = "../lights" }
@@ -34,11 +36,12 @@ wasm-bindgen-futures = "0.4.37"
 wasm-logger = "0.2.0"
 web-sys = { version = "0.3.64", features = ["CanvasRenderingContext2d", "HtmlCanvasElement"] }
 wee_alloc = { version = "0.4.5", optional = true }
-ybc = "0.4.0"
-yew = "0.20.0" # TODO: upgrade this after ybc upgrades
-yew-mdc-widgets = { git = "https://github.com/noogen-projects/yew-mdc-widgets.git", revision = "4370fd46fb04fac89bc91b6f12f72dd6e8d1486b" }
-yewtil = "0.4.0"
+ybc = { git = "https://github.com/favilo/ybc", branch = "master" }
+yew = "0.21.0" 
 
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = false
 debug = true
+
+[patch.crates-io]
+# ybc = { path = "../ybc" }

@@ -84,14 +84,14 @@ pub struct RuneScript {
 impl RuneScript {
     pub fn from_source(sourcecode: SourceCode) -> Result<Self, RuneError> {
         // TODO: Figure out which functions and stuff we want to provide to Rune
+        log::info!("Creating context");
         let mut context = Context::with_default_modules()?;
+        log::info!("Created context: {context:?}");
         context.install(&types::module()?)?;
-        log::info!("Loading source: {sourcecode:?}");
 
         let options = Options::default();
         let mut sources = Sources::new();
         sources.insert(Source::new("main", &sourcecode.to_string())?)?;
-        log::info!("inserted source: {sources:?}");
 
         let mut diagnostics = Diagnostics::new();
         let result = rune::prepare(&mut sources)

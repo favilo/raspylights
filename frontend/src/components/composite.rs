@@ -2,7 +2,6 @@ use std::str::FromStr;
 
 use lights::effects::EffectType;
 use yew::prelude::*;
-use yewtil::NeqAssign;
 
 use crate::utils::{view_ball, view_balls, view_composite, view_empty, view_glow, view_rainbow};
 

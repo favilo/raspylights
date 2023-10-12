@@ -4,7 +4,6 @@ use palette::LinSrgb;
 use wasm_bindgen::{JsCast, UnwrapThrowExt};
 use web_sys::HtmlInputElement;
 use yew::prelude::*;
-use yewtil::NeqAssign;
 
 #[derive(Clone, Debug)]
 pub(crate) struct Rainbow {
@@ -137,20 +136,23 @@ impl Component for Rainbow {
                     <label class="label">{ "Spacing between colors" }</label>
                     <ybc::Control classes={ classes!("has-addons") }>
                         <input type="number" name="spacing" id="spacing_real" class="input"
-                            // onchange={
-                            //     ctx.link().callback(move |ty: Event| {
-                            //         let target: HtmlInputElement = ty.target().dyn_into().unwrap_throw();
-                            //         let value = target.value();
-                            //         let spacing = value.parse().unwrap_or(3);
-                            //         Msg::Spacing(spacing)
-                            //     })
-                            // }
-                            // oninput={
-                            //     ctx.link().callback(move |ty:InputEvent| {
-                            //         let spacing = ty.value.parse().unwrap_or(100);
-                            //         Msg::Spacing(spacing)
-                            //     })
-                            // }
+                            onchange={
+                                ctx.link().callback(move |e: Event| {
+                                    let target: HtmlInputElement = e.target().unwrap_throw().dyn_into().unwrap_throw();
+                                    let value = target.value();
+                                    let spacing = value.parse().unwrap_or(3);
+                                    Msg::Spacing(spacing)
+                                })
+                            }
+                            oninput={
+                                ctx.link().callback(move |e:InputEvent| {
+                                    let event: Event = e.dyn_into().unwrap_throw();
+                                    let target: HtmlInputElement = event.target().unwrap_throw().dyn_into().unwrap_throw();
+                                    let value = target.value();
+                                    let spacing = value.parse().unwrap_or(100);
+                                    Msg::Spacing(spacing)
+                                })
+                            }
                             value= { ctx.props().rainbow.spacing().to_string() }
                             />
                     </ybc::Control>
@@ -165,42 +167,43 @@ impl Component for Rainbow {
                             step="10"
                             id="delay"
                             name="delay"
-                            // onchange={
-                            //     ctx.link().callback(move |ty| {
-                            //         let target: HtmlInputElement = ty.dyn_into().unwrap_throw();
-                            //         let value = target.value();
-                            //         let delay = value.parse().unwrap_or(100) ;
-                            //         Msg::Delay(delay)
-                            //     })
-                            // }
-                            // oninput={
-                            //     ctx.link().callback(move |ty: InputEvent| {
-                            //         let event: Event = ty.dyn_into().unwrap_throw();
-                            //         let target: HtmlInputElement = event.target().dyn_into().unwrap_throw();
-                            //         let delay = target.value().parse().unwrap_or(100);
-                            //         Msg::Delay(delay)
-                            //     })
-                            // }
+                            onchange={
+                                ctx.link().callback(move |e: Event| {
+                                    let target: HtmlInputElement = e.target().unwrap_throw().dyn_into().unwrap_throw();
+                                    let value = target.value();
+                                    let delay = value.parse().unwrap_or(100) ;
+                                    Msg::Delay(delay)
+                                })
+                            }
+                            oninput={
+                                ctx.link().callback(move |e: InputEvent| {
+                                    let event: Event = e.dyn_into().unwrap_throw();
+                                    let target: HtmlInputElement = event.target().unwrap_throw().dyn_into().unwrap_throw();
+                                    let delay = target.value().parse().unwrap_or(100);
+                                    Msg::Delay(delay)
+                                })
+                            }
                             value= { ctx.props().rainbow.delay.num_milliseconds().to_string() }
                         />
                         <label>
                             <input type="number" name="delay" id="delay_real" class="input"
-                                // onchange={
-                                //     ctx.link().callback(move |ty| {
-                                //         let event: Event = ty.dyn_into().unwrap_throw();
-                                //         let target: HtmlInputElement = event.target().dyn_into().unwrap_throw();
-                                //         let value = target.value();
-                                //         let delay = value.parse().unwrap_or(100) ;
-                                //         Msg::Delay(delay)
-                                //     })
-                                // }
-                                // oninput={
-                                //     ctx.link().callback(move |ty:InputEvent| {
-                                //         let target: HtmlInputElement = ty.dyn_into().unwrap_throw();
-                                //         let delay = target.value().parse().unwrap_or(100);
-                                //         Msg::Delay(delay)
-                                //     })
-                                // }
+                                onchange={
+                                    ctx.link().callback(move |e: Event| {
+                                        let event: Event = e.dyn_into().unwrap_throw();
+                                        let target: HtmlInputElement = event.target().unwrap_throw().dyn_into().unwrap_throw();
+                                        let value = target.value();
+                                        let delay = value.parse().unwrap_or(100) ;
+                                        Msg::Delay(delay)
+                                    })
+                                }
+                                oninput={
+                                    ctx.link().callback(move |e:InputEvent| {
+                                        let event: Event = e.dyn_into().unwrap_throw();
+                                        let target: HtmlInputElement = event.target().unwrap_throw().dyn_into().unwrap_throw();
+                                        let delay = target.value().parse().unwrap_or(100);
+                                        Msg::Delay(delay)
+                                    })
+                                }
                                 value= { ctx.props().rainbow.delay.num_milliseconds().to_string() }
                             /><a class="button is-static">{ "ms" }</a></label>
                     </ybc::Control>

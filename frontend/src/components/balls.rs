@@ -1,7 +1,5 @@
 use yew::prelude::*;
-use yew_mdc_widgets::{yew::ToHtml, Button};
-use yewtil::NeqAssign;
-
+ 
 #[derive(Clone, Debug)]
 pub(crate) struct Balls {
     effect: lights::effects::Balls,
@@ -53,46 +51,47 @@ impl Component for Balls {
     }
 
     fn view(&self, ctx: &Context<Self>) -> Html {
-        html! { <></> }
-        // let inner: Vec<_> = ctx
-        //     .props()
-        //     .balls
-        //     .balls()
-        //     .iter()
-        //     .enumerate()
-        //     .map(|(idx, b)| {
-        //         html! {
-        //             <>
-        //                 <super::Ball
-        //                     ball = { b.clone() }
-        //                     onupdate = { Some(ctx.link().callback(move |ball| {
-        //                         Msg::SetBall(idx, ball)
-        //                     })) }
-        //                  />
-        //                 <ybc::Control>
-        //                     <input type="button"
-        //                         onclick={
-        //                             ctx.link().callback(move |_| {
-        //                                 Msg::RemoveBall(idx)
-        //                             })
-        //                         }
-        //                         value={ "-" }
-        //                     />
-        //                 </ybc::Control>
-        //                 <hr />
-        //             </>
-        //         }
-        //     })
-        //     .collect();
-        // let add_button = Button::new().label("+");
-        // let add_button =
-        //     add_button.on_click(ctx.link().callback(move |_: MouseEvent| Msg::AddBall));
+        let inner: Vec<_> = ctx
+            .props()
+            .balls
+            .balls()
+            .iter()
+            .enumerate()
+            .map(|(idx, b)| {
+                html! {
+                    <>
+                        <super::Ball
+                            ball = { b.clone() }
+                            onupdate = { Some(ctx.link().callback(move |ball| {
+                                Msg::SetBall(idx, ball)
+                            })) }
+                         />
+                        <ybc::Control>
+                            <ybc::Button 
+                                onclick={
+                                    ctx.link().callback(move |_| {
+                                        Msg::RemoveBall(idx)
+                                    })
+                                }
+                             >{ "-" }</ybc::Button>
+                        </ybc::Control>
+                        <hr />
+                    </>
+                }
+            })
+            .collect();
+        let add_button = html! {
+            <ybc::Button onclick={ ctx.link().callback(|_: MouseEvent| Msg::AddBall) }>{ "+" }</ybc::Button>
+        };
+        // let add_button = add_button.on_click(move |_: MouseEvent| {
+            // Msg::AddBall;
+        // });
 
-        // html! {
-        //     <>
-        //         { inner }
-        //         { add_button.to_html() }
-        //     </>
-        // }
+        html! {
+            <>
+                { inner }
+                { add_button }
+            </>
+        }
     }
 }
