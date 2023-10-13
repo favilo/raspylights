@@ -2,11 +2,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::effects::EffectType;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Details {
-    pub length: usize,
     pub effect: EffectType,
+    pub length: usize,
     pub brightness: u8,
+    pub name: String,
 }
 
 impl Default for Details {
@@ -15,6 +16,7 @@ impl Default for Details {
             length: 100,
             brightness: 150,
             effect: Default::default(),
+            name: Default::default(),
         }
     }
 }

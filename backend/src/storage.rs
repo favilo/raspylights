@@ -27,7 +27,7 @@ where
     type DItem = T;
 
     fn bytes_decode(bytes: &'a [u8]) -> Result<Self::DItem, Box<dyn Error>> {
-        Ok(rmp_serde::from_read_ref(bytes)?)
+        Ok(rmp_serde::from_slice(bytes)?)
     }
 }
 
@@ -67,12 +67,11 @@ impl Storage {
 
     pub(crate) async fn store(
         &mut self,
-        key: &'static str,
+        key: &str,
         details: Details,
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
         let env = self.env.clone();
         let db = self.effect_database.clone();
-        let key = key.clone();
         task::spawn_blocking(move || {
             let mut txn = env
                 .write_txn()

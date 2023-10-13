@@ -11,6 +11,8 @@ pub enum Error {
     #[error("Index out of range")]
     IndexOutOfRange,
 
+    // TODO: Think about how to make this use #[from] 
+    // without adding heed to the wasm build
     #[error("Heed Error")]
     HeedError,
 

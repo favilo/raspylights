@@ -6,7 +6,7 @@ use web_sys::HtmlInputElement;
 use yew::{platform::spawn_local, prelude::*};
 
 use crate::{
-    components,
+    components::{self, ApplyForm, HistoryList},
     utils::{
         view_ball, view_balls, view_composite, view_empty, view_glow, view_rainbow, view_runescript,
     },
@@ -39,6 +39,8 @@ pub enum Msg {
     Brightness(u8),
     FetchDetails(usize, u8),
     PostStatus(Details),
+    Save(String),
+    Reset,
 }
 
 impl Component for App {
@@ -58,12 +60,12 @@ impl Component for App {
             Msg::Type(t) => {
                 self.store_last_effect(&t);
                 self.model.details.effect = t;
-                true
+                false
             }
             Msg::EffectName(name) => {
                 // Used for when we click the title
                 self.model.details.effect = self.load_last_effect(name);
-                true
+                false
             }
             Msg::FetchDetails(l, b) => {
                 self.model.details.length = l;
@@ -76,11 +78,19 @@ impl Component for App {
             }
             Msg::Length(l) => {
                 self.model.details.length = l;
-                true
+                false
             }
             Msg::Brightness(b) => {
                 self.model.details.brightness = b;
+                false
+            }
+            Msg::Save(name) => {
+                self.model.details.name = name;
                 true
+            }
+            Msg::Reset => {
+                self.model = Self::load_model(ctx).unwrap_or_default();
+                false
             }
         };
 
@@ -93,7 +103,7 @@ impl Component for App {
     }
 
     fn view(&self, ctx: &Context<Self>) -> Html {
-        let dropdown = self.view_selector(ctx);
+        let selector = self.view_selector(ctx);
         let preview = self.view_preview();
         let effect = self.view_own_effect(ctx);
         html! {
@@ -129,14 +139,42 @@ impl Component for App {
                         }
                     />
                 </ybc::Box>
-                <ybc::Box classes={ classes!("main_preview") }>
-                    { preview }
-                </ybc::Box>
+                <ybc::Columns>
+                    <ybc::Column classes={ classes!("is-one-quarter") }>
+                      // The history and apply sidebar
+                      <ybc::Box classes={ classes!("form") }>
+                        <ApplyForm
+                            name={ self.model.details.name.clone() }
+                            on_save={
+                                ctx.link().callback(|name: String| {
+                                    Msg::Save(name)
+                                })
+                            }
+                            on_reset={
+                                ctx.link().callback(|_| {
+                                    Msg::Reset
+                                })
+                            }
+                        />
+                      </ybc::Box>
+                      <ybc::Box classes={ classes!("history_list") }>
+                        <HistoryList
+                            selected={ self.model.details.name.clone() }
+                        />
+                      </ybc::Box>
+                    </ybc::Column>
+                    <ybc::Column>
+                        // The preview and effect selector
+                        <ybc::Box classes={ classes!("main_preview") }>
+                            { preview }
+                        </ybc::Box>
+                        <ybc::Box classes={ classes!("effect-select") }>
+                            { selector }
+                            <div class="effect">{ effect }</div>
+                        </ybc::Box>
+                    </ybc::Column>
+                </ybc::Columns>
                 // The effects
-                <ybc::Box classes={ classes!("effect-select") }>
-                    { dropdown }
-                    <div class="effect">{ effect }</div>
-                </ybc::Box>
             </>
         }
     }

@@ -1,6 +1,6 @@
 [build]
 # (Optional) Set default target for cargo build
-target = "armv7-unknown-linux-gnueabihf"
+target = "armv7-unknown-linux-musleabihf"
 
 # Pi 0/1
 [target.arm-unknown-linux-gnueabihf]
@@ -14,4 +14,5 @@ linker = "arm-linux-gnueabihf-gcc"
 linker = "arm-linux-gnueabihf-gcc"
 
 [target.armv7-unknown-linux-musleabihf]
-linker = "arm-linux-gnueabihf-gcc"
+linker = "arm-linux-musleabihf-gcc"
+# cflags = "-Wno-bad-function-cast -Wno-sign-compare"

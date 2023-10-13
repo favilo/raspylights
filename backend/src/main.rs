@@ -3,8 +3,10 @@
 mod storage;
 mod strip;
 
+#[cfg(target_arch = "arm")]
+use std::fs::File;
+
 use std::{
-    fs::File,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -22,6 +24,8 @@ use async_std::{
 use chrono::Utc;
 #[cfg(target_arch = "arm")]
 use daemonize::Daemonize;
+#[cfg(target_arch = "arm")]
+use homedir::get_my_home;
 use lights::{details::Details, effects::RuneScript, error::Error};
 use serde_json::Value;
 use signal_hook::consts;
@@ -36,11 +40,10 @@ async fn render_main(
     term: Arc<AtomicBool>,
     storage: Storage,
 ) -> Result<()> {
-    let storage = Arc::new(Mutex::new(storage));
     let mut strip = LedStrip::new(details.read().await.clone())?;
     strip.set_effect(details.read().await.effect.clone())?;
 
-    let script = RuneScript::default();
+    // let script = RuneScript::default();
     // log::info!("Script: {:#?}", script);
 
     loop {
@@ -51,13 +54,6 @@ async fn render_main(
             break;
         }
 
-        if !power.load(Ordering::Relaxed) {
-            // Power is off, lets render black every 100 ms
-            task::sleep(std::time::Duration::from_millis(100)).await;
-            strip.render()?;
-            continue;
-        }
-
         if let Ok(deets) = receiver.try_recv() {
             log::info!("We got some deets: {:#?}", deets);
             strip.set_effect(deets.effect.clone())?;
@@ -65,13 +61,15 @@ async fn render_main(
             strip.set_brightness(deets.brightness)?;
             *details.write().await = deets.clone();
 
-            // TODO: Make this function async, so we can await in a different thread
-            storage
-                .lock()
-                .await
-                .store("main", deets)
-                .await
-                .map_err(|_| Error::HeedError)?;
+            storage.store(&deets.name, deets).await.map_err(|_| Error::HeedError)?;
+            storage.store("__main__", deets).await.map_err(|_| Error::HeedError)?;
+        }
+
+        if !power.load(Ordering::Relaxed) {
+            // Power is off, lets render black every 100 ms
+            task::sleep(std::time::Duration::from_millis(100)).await;
+            strip.render()?;
+            continue;
         }
         let d = strip.update(start)?;
         strip.render()?;
@@ -114,6 +112,10 @@ async fn post_details(mut req: Request<State>) -> tide::Result {
         .content_type(mime::JSON)
         .build();
     Ok(resp.into())
+}
+
+async fn get_history(mut req: Request<State>) -> tide::Result {
+    Ok("".into())
 }
 
 async fn get_power(req: Request<State>) -> tide::Result {
@@ -165,6 +167,8 @@ async fn web_main(
     app.at("/mdc").serve_dir("./frontend/static/mdc/")?;
     app.at("/style.css")
         .serve_file("./frontend/static/style.css")?;
+    app.at("/bulma-list.css")
+        .serve_file("./frontend/static/bulma-list.css")?;
     app.listen("0.0.0.0:8000").race(die).await?;
     Ok(())
 }
@@ -174,12 +178,17 @@ fn main() -> Result<()> {
 
     #[cfg(target_arch = "arm")]
     {
-        let stdout = File::create("/home/pi/raspylights.out").unwrap();
-        let stderr = File::create("/home/pi/raspylights.err").unwrap();
+        let home = get_my_home()?.unwrap();
+        let stdout = home.clone().push("raspylights.out");
+        let stderr = home.clone().push("raspylights.err");
 
+        let stdout = File::create(stdout).unwrap();
+        let stderr = File::create(stderr).unwrap();
+
+        let pidfile = home.clone().push("raspylights.pid");
         let daemonize = Daemonize::new()
-            .pid_file("/home/pi/raspylights.pid")
-            .working_directory("/home/pi")
+            .pid_file(pidfile)
+            .working_directory(home)
             .stdout(stdout)
             .stderr(stderr);
 
@@ -201,7 +210,7 @@ fn main() -> Result<()> {
     let mut storage = Storage::open("./db/effects.db").map_err(|_| Error::HeedError)?;
     let (sender, receiver) = channel::bounded(1);
     let details = storage
-        .load("main")
+        .load("__main__")
         .expect("load failed")
         .unwrap_or_default();
     log::info!("Details loaded: {:#?}", details);

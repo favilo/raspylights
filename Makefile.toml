@@ -69,14 +69,14 @@ env = { "CFLAGS" = "-mfpu=vfp -mfloat-abi=hard", "RPI_WS281X_SYSROOT" = "/usr/ar
 description = "Build server in debug mode for Raspberry Pi"
 clear = true
 command = "cargo"
-args = ["build", "--package", "backend", "--target=armv7-unknown-linux-gnueabihf"]
+args = ["build", "--package", "backend", "--target=armv7-unknown-linux-musleabihf"]
 
 [tasks.build_server_release_rpi]
 env = { "CFLAGS" = "-mfpu=vfp -mfloat-abi=hard", "RPI_WS281X_SYSROOT" = "/usr/arm-linux-gnueabihf" }
 description = "Build server in release mode for Raspberry Pi"
 clear = true
 command = "cargo"
-args = ["build", "--package", "backend", "--release", "--target=armv7-unknown-linux-gnueabihf"]
+args = ["build", "--package", "backend", "--release", "--target=armv7-unknown-linux-musleabihf"]
 
 # ---- START ----
 

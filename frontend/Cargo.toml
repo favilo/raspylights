@@ -43,5 +43,3 @@ yew = "0.21.0"
 wasm-opt = false
 debug = true
 
-[patch.crates-io]
-# ybc = { path = "../ybc" }
